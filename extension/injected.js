@@ -27,8 +27,9 @@
     origCreate: null,
     origUpdate: null,
     origDispose: null,
-    enemyInstances: new Set(),
     activeCamera: null,
+    alliances: null,
+    viewer: null,
     overlayCanvas: null,
     overlayCtx: null,
     rafId: null,
@@ -219,7 +220,8 @@
       try {
         this.__unameLblTracked = true;
         if (!state.activeCamera && this.camera) state.activeCamera = this.camera;
-        if (resolveTeam(this) === 'enemy') state.enemyInstances.add(this);
+        if (!state.alliances && this.alliances) state.alliances = this.alliances;
+        if (!state.viewer && this.viewer) state.viewer = this.viewer;
         if (shouldShowLabel(this)) attachLabel(this);
       } catch (e) { warn('create patch:', e); }
       return ret;
@@ -231,7 +233,8 @@
         if (!this.__unameLblTracked) {
           this.__unameLblTracked = true;
           if (!state.activeCamera && this.camera) state.activeCamera = this.camera;
-          if (resolveTeam(this) === 'enemy') state.enemyInstances.add(this);
+          if (!state.alliances && this.alliances) state.alliances = this.alliances;
+          if (!state.viewer && this.viewer) state.viewer = this.viewer;
         }
         if (!shouldShowLabel(this)) {
           if (this.__unameLbl) detachLabel(this);
@@ -247,7 +250,6 @@
       P.prototype.dispose = function () {
         try {
           detachLabel(this);
-          state.enemyInstances.delete(this);
         } catch (e) { warn('dispose patch:', e); }
         return state.origDispose.apply(this, arguments);
       };
@@ -326,45 +328,51 @@
     const MARGIN     = 24;   // px inset from the viewport edge
     const ARROW_HALF = 10;   // half-length of arrow head
 
-    for (const pip of state.enemyInstances) {
+    if (!state.alliances || !state.viewer) return;
+    const local = state.viewer.value;
+    const cx = W / 2, cy = H / 2;
+
+    for (const player of state.alliances.playerList.players) {
+      if (player === local || player.isNeutral || state.alliances.areAllied(player, local)) continue;
       try {
-        if (!pip.rootObj || (pip.gameObject && pip.gameObject.isDestroyed)) continue;
-        pip.rootObj.getWorldPosition(_tmpV3);
-        _tmpV3.project(camera); // → NDC in [-1, 1]
+        for (const go of player.getOwnedObjects()) {
+          if (go.isDestroyed || !go.position) continue;
+          try {
+            const wp = go.position.worldPosition;
+            _tmpV3.set(wp.x, wp.y, wp.z);
+            _tmpV3.project(camera);
 
-        const sx = (_tmpV3.x + 1) / 2 * W;
-        const sy = (-_tmpV3.y + 1) / 2 * H;
-        if (sx >= MARGIN && sx <= W - MARGIN && sy >= MARGIN && sy <= H - MARGIN) continue;
+            const sx = (_tmpV3.x + 1) / 2 * W;
+            const sy = (-_tmpV3.y + 1) / 2 * H;
+            if (sx >= MARGIN && sx <= W - MARGIN && sy >= MARGIN && sy <= H - MARGIN) continue;
 
-        // Direction from viewport centre toward unit
-        const cx = W / 2, cy = H / 2;
-        const angle = Math.atan2(sy - cy, sx - cx);
-        const cos = Math.cos(angle), sin = Math.sin(angle);
+            const angle = Math.atan2(sy - cy, sx - cx);
+            const cos = Math.cos(angle), sin = Math.sin(angle);
 
-        // Edge intersection: scale direction to reach the inset border
-        const scaleX = (cos !== 0) ? (W / 2 - MARGIN) / Math.abs(cos) : Infinity;
-        const scaleY = (sin !== 0) ? (H / 2 - MARGIN) / Math.abs(sin) : Infinity;
-        const scale  = Math.min(scaleX, scaleY);
-        const ex = cx + cos * scale;
-        const ey = cy + sin * scale;
+            const scaleX = (cos !== 0) ? (W / 2 - MARGIN) / Math.abs(cos) : Infinity;
+            const scaleY = (sin !== 0) ? (H / 2 - MARGIN) / Math.abs(sin) : Infinity;
+            const scale  = Math.min(scaleX, scaleY);
+            const ex = cx + cos * scale;
+            const ey = cy + sin * scale;
 
-        // Draw filled arrow pointing toward unit
-        ctx.save();
-        ctx.translate(ex, ey);
-        ctx.rotate(angle);
-        ctx.beginPath();
-        ctx.moveTo(ARROW_HALF, 0);
-        ctx.lineTo(-ARROW_HALF, -ARROW_HALF * 0.6);
-        ctx.lineTo(-ARROW_HALF * 0.4, 0);
-        ctx.lineTo(-ARROW_HALF, ARROW_HALF * 0.6);
-        ctx.closePath();
-        ctx.fillStyle   = 'rgba(210,30,30,0.9)';
-        ctx.strokeStyle = 'rgba(255,255,255,0.8)';
-        ctx.lineWidth   = 1.5;
-        ctx.fill();
-        ctx.stroke();
-        ctx.restore();
-      } catch (_) { /* skip bad instance */ }
+            ctx.save();
+            ctx.translate(ex, ey);
+            ctx.rotate(angle);
+            ctx.beginPath();
+            ctx.moveTo(ARROW_HALF, 0);
+            ctx.lineTo(-ARROW_HALF, -ARROW_HALF * 0.6);
+            ctx.lineTo(-ARROW_HALF * 0.4, 0);
+            ctx.lineTo(-ARROW_HALF, ARROW_HALF * 0.6);
+            ctx.closePath();
+            ctx.fillStyle   = 'rgba(210,30,30,0.9)';
+            ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+            ctx.lineWidth   = 1.5;
+            ctx.fill();
+            ctx.stroke();
+            ctx.restore();
+          } catch (_) { /* skip bad go */ }
+        }
+      } catch (_) { /* skip bad player */ }
     }
   }
 
