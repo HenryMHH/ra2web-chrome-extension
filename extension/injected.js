@@ -296,11 +296,13 @@
     }
   }
 
-  const _tmpV3 = new THREE.Vector3();
+  let _tmpV3 = null;
 
   function drawIndicators() {
+    if (!state.showIndicators) { state.rafId = null; return; }
     state.rafId = requestAnimationFrame(drawIndicators);
-    if (!state.showIndicators || !state.overlayCanvas || !state.activeCamera) return;
+    if (!state.overlayCanvas || !state.activeCamera) return;
+    if (!_tmpV3) _tmpV3 = new THREE.Vector3();
 
     const canvas = state.overlayCanvas;
     const ctx    = state.overlayCtx;
@@ -322,7 +324,7 @@
 
         const sx = (_tmpV3.x + 1) / 2 * W;
         const sy = (-_tmpV3.y + 1) / 2 * H;
-        if (sx >= MARGIN && sx <= W - MARGIN && sy >= MARGIN && sy <= H - MARGIN) continue;
+        if (sx >= 0 && sx <= W && sy >= 0 && sy <= H) continue;
 
         // Direction from viewport centre toward unit
         const cx = W / 2, cy = H / 2;
@@ -380,7 +382,8 @@
 
     if (state.showIndicators) {
       initOverlay();
-      if (!state.rafId) drawIndicators();
+      if (state.rafId) { cancelAnimationFrame(state.rafId); state.rafId = null; }
+      drawIndicators();
       log('apply: indicators enabled');
     } else {
       removeOverlay();
