@@ -30,6 +30,7 @@
     activeCamera: null,
     alliances: null,
     viewer: null,
+    strings: null,
     overlayCanvas: null,
     overlayCtx: null,
     rafId: null,
@@ -74,6 +75,19 @@
       const key = rules.uiName;
       if (key && self.strings && typeof self.strings.get === 'function') {
         const v = self.strings.get(key);
+        if (v && v !== key) return v;
+      }
+      return rules.name || null;
+    } catch (_) { return null; }
+  }
+
+  function resolveNameFromGo(go) {
+    try {
+      const rules = go.rules;
+      if (!rules) return null;
+      const key = rules.uiName;
+      if (key && state.strings && typeof state.strings.get === 'function') {
+        const v = state.strings.get(key);
         if (v && v !== key) return v;
       }
       return rules.name || null;
@@ -222,6 +236,7 @@
         if (!state.activeCamera && this.camera) state.activeCamera = this.camera;
         if (!state.alliances && this.alliances) state.alliances = this.alliances;
         if (!state.viewer && this.viewer) state.viewer = this.viewer;
+        if (!state.strings && this.strings) state.strings = this.strings;
         if (shouldShowLabel(this)) attachLabel(this);
       } catch (e) { warn('create patch:', e); }
       return ret;
@@ -235,6 +250,7 @@
           if (!state.activeCamera && this.camera) state.activeCamera = this.camera;
           if (!state.alliances && this.alliances) state.alliances = this.alliances;
           if (!state.viewer && this.viewer) state.viewer = this.viewer;
+          if (!state.strings && this.strings) state.strings = this.strings;
         }
         if (!shouldShowLabel(this)) {
           if (this.__unameLbl) detachLabel(this);
@@ -370,6 +386,29 @@
             ctx.fill();
             ctx.stroke();
             ctx.restore();
+
+            const goName = resolveNameFromGo(go);
+            if (goName) {
+              ctx.save();
+              const LABEL_FS = 11;
+              ctx.font = `600 ${LABEL_FS}px 'Fira Sans Condensed', Arial, sans-serif`;
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'top';
+              const PX = 5, PY = 3;
+              const tw = ctx.measureText(goName).width;
+              const lw = tw + PX * 2;
+              const lh = LABEL_FS + PY * 2;
+              const lx = ex - lw / 2;
+              const ly = ey + ARROW_HALF + 4;
+              ctx.fillStyle = 'rgba(210,30,30,0.9)';
+              ctx.fillRect(lx, ly, lw, lh);
+              ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+              ctx.lineWidth = 1;
+              ctx.strokeRect(lx, ly, lw, lh);
+              ctx.fillStyle = 'white';
+              ctx.fillText(goName, ex, ly + PY);
+              ctx.restore();
+            }
           } catch (_) { /* skip bad go */ }
         }
       } catch (_) { /* skip bad player */ }
