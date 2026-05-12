@@ -376,7 +376,8 @@
     state.showNeutral    = !!showNeutral;
     state.showIndicators = !!showIndicators;
     state.fontSize       = (typeof fontSize === 'number' && fontSize >= 10 && fontSize <= 20)
-                             ? fontSize : 14;
+                             ? fontSize
+                             : (warn('apply: invalid fontSize', fontSize, '— using 14'), 14);
 
     const needPatch = state.enabled || state.showIndicators;
     if (needPatch) {
