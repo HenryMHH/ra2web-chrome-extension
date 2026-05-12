@@ -8,12 +8,13 @@ const els = {
   enabled: $('enabled'),
   labelExisting: $('labelExisting'),
   rowExisting: $('row-existing'),
+  chkIndicators: $('chk-indicators'),
   apply: $('apply'),
   msg: $('msg'),
 };
 
 const STORAGE_KEY = 'ra2NamesSettings';
-const DEFAULTS = { enabled: false, labelExisting: false };
+const DEFAULTS = { enabled: false, labelExisting: false, showIndicators: false };
 
 function setStatus(kind, text) {
   els.status.className = 'status status-' + kind;
@@ -42,6 +43,7 @@ async function loadSettings() {
   const s = obj[STORAGE_KEY] || DEFAULTS;
   els.enabled.checked = !!s.enabled;
   els.labelExisting.checked = !!s.labelExisting;
+  els.chkIndicators.checked = !!s.showIndicators;
   updateExistingRow();
 }
 
@@ -49,6 +51,7 @@ async function saveSettings() {
   const s = {
     enabled: els.enabled.checked,
     labelExisting: els.labelExisting.checked,
+    showIndicators: els.chkIndicators.checked,
   };
   await chrome.storage.local.set({ [STORAGE_KEY]: s });
   return s;
