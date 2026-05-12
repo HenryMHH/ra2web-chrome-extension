@@ -20,7 +20,7 @@
     SpriteUtils: null,
     Coords: null,
     enabled: false,
-    labelExisting: false,
+    showNeutral: false,
     showIndicators: false,
     patched: false,
     origCreate: null,
@@ -58,6 +58,7 @@
       const local = self.viewer && self.viewer.value;
       const owner = self.gameObject && self.gameObject.owner;
       if (!local || !owner) return 'unknown';
+      if (owner.isNeutral) return 'neutral';
       if (owner === local) return 'self';
       if (self.alliances && self.alliances.areAllied(owner, local)) return 'ally';
       return 'enemy';
@@ -82,7 +83,8 @@
     if (!name) return null;
 
     const team = resolveTeam(self);
-    const bgColor = team === 'enemy' ? 'rgba(160,0,0,0.88)'
+    const bgColor = team === 'enemy'   ? 'rgba(160,0,0,0.88)'
+                  : team === 'neutral' ? 'rgba(0,130,50,0.88)'
                   : team === 'unknown' ? 'rgba(70,70,70,0.88)'
                   : 'rgba(0,50,160,0.88)';
 
@@ -149,6 +151,17 @@
     };
   }
 
+  function shouldShowLabel(self) {
+    if (!state.enabled) return false;
+    const team = resolveTeam(self);
+    if (team === 'neutral') {
+      if (!state.showNeutral) return false;
+      const rules = self.gameObject && self.gameObject.rules;
+      if (rules && rules.insignificant) return false;
+    }
+    return true;
+  }
+
   function attachLabel(self) {
     if (!self.rootObj || self.__unameLbl) return;
     const lbl = buildLabel(self);
@@ -202,11 +215,10 @@
     P.prototype.create3DObject = function () {
       const ret = state.origCreate.apply(this, arguments);
       try {
-        this.__unameLblBornHere = true;
-        this.__unameLblTracked  = true;
+        this.__unameLblTracked = true;
         if (!state.activeCamera && this.camera) state.activeCamera = this.camera;
         if (resolveTeam(this) === 'enemy') state.enemyInstances.add(this);
-        if (state.enabled) attachLabel(this);
+        if (shouldShowLabel(this)) attachLabel(this);
       } catch (e) { warn('create patch:', e); }
       return ret;
     };
@@ -214,17 +226,16 @@
     P.prototype.update = function () {
       const ret = state.origUpdate ? state.origUpdate.apply(this, arguments) : undefined;
       try {
-        // Lazy-track existing instances (born before patch was applied)
         if (!this.__unameLblTracked) {
           this.__unameLblTracked = true;
           if (!state.activeCamera && this.camera) state.activeCamera = this.camera;
           if (resolveTeam(this) === 'enemy') state.enemyInstances.add(this);
         }
-
-        if (!state.enabled) return ret;
-        const isExisting = !this.__unameLblBornHere;
-        if (isExisting && !state.labelExisting) return ret;
-        if (isExisting && !this.__unameLbl) attachLabel(this);
+        if (!shouldShowLabel(this)) {
+          if (this.__unameLbl) detachLabel(this);
+          return ret;
+        }
+        if (!this.__unameLbl) attachLabel(this);
         else refreshLabel(this);
       } catch (e) { warn('update patch:', e); }
       return ret;
@@ -358,9 +369,9 @@
   // ---------------------------------------------------------------------------
   // Public commands, called from the content script via postMessage
   // ---------------------------------------------------------------------------
-  async function apply({ enabled, labelExisting, showIndicators }) {
+  async function apply({ enabled, showNeutral, showIndicators }) {
     state.enabled        = !!enabled;
-    state.labelExisting  = !!labelExisting;
+    state.showNeutral    = !!showNeutral;
     state.showIndicators = !!showIndicators;
 
     const needPatch = state.enabled || state.showIndicators;
@@ -371,7 +382,7 @@
     }
 
     if (state.enabled) {
-      log('apply: labels enabled, labelExisting=' + state.labelExisting);
+      log('apply: labels enabled, showNeutral=' + state.showNeutral);
     } else {
       await sweepLeftoverLabels();
       log('apply: labels disabled, swept');
@@ -387,7 +398,7 @@
       log('apply: indicators disabled');
     }
 
-    return { ok: true, state: { enabled: state.enabled, labelExisting: state.labelExisting, showIndicators: state.showIndicators } };
+    return { ok: true, state: { enabled: state.enabled, showNeutral: state.showNeutral, showIndicators: state.showIndicators } };
   }
 
   function getStatus() {
@@ -396,7 +407,7 @@
       patched: state.patched,
       classesReady: !!(state.PipOverlay && state.CanvasUtils && state.SpriteUtils && state.Coords),
       enabled: state.enabled,
-      labelExisting: state.labelExisting,
+      showNeutral: state.showNeutral,
       showIndicators: state.showIndicators,
       systemAvailable: typeof System !== 'undefined' && !!System.import,
       threeAvailable: typeof THREE !== 'undefined' && !!THREE.WebGLRenderer,
