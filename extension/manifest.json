@@ -1,0 +1,52 @@
+{
+  "manifest_version": 3,
+  "name": "RA2 Web — Unit Name Labels",
+  "version": "0.3.0",
+  "description": "Show each unit's name above it in the Chrono Divide / RA2 Web client. Toggleable via the popup.",
+  "permissions": ["storage", "scripting", "activeTab"],
+  "host_permissions": [
+    "https://game.chronodivide.com/*",
+    "https://chronodivide.com/*",
+    "https://*.ra2web.com/*",
+    "https://ra2web.com/*"
+  ],
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "action": {
+    "default_title": "RA2 Unit Names",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png",
+      "48": "icons/icon-48.png"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://game.chronodivide.com/*",
+        "https://chronodivide.com/*",
+        "https://*.ra2web.com/*",
+        "https://ra2web.com/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle",
+      "all_frames": true
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["injected.js"],
+      "matches": [
+        "https://game.chronodivide.com/*",
+        "https://chronodivide.com/*",
+        "https://*.ra2web.com/*",
+        "https://ra2web.com/*"
+      ]
+    }
+  ]
+}

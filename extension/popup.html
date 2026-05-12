@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <title>RA2 Unit Names</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header>
+    <h1>RA2 單位名稱</h1>
+    <div id="status" class="status status-unknown">尚未連線</div>
+  </header>
+
+  <main>
+    <label class="row">
+      <input type="checkbox" id="enabled">
+      <div class="row-text">
+        <div class="row-title">顯示單位名稱</div>
+        <div class="row-sub">在每個單位上方顯示名稱</div>
+      </div>
+    </label>
+
+    <label class="row" id="row-existing">
+      <input type="checkbox" id="labelExisting">
+      <div class="row-text">
+        <div class="row-title">也標示既存單位</div>
+        <div class="row-sub">關閉時,只標示之後生產出來的新單位</div>
+      </div>
+    </label>
+
+    <div class="actions">
+      <button id="apply" class="primary">套用</button>
+    </div>
+
+    <div id="msg" class="msg"></div>
+  </main>
+
+  <footer>
+    遊戲頁面開啟時才會生效
+  </footer>
+
+  <script src="popup.js"></script>
+</body>
+</html>
