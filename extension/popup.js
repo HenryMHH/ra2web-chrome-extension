@@ -32,6 +32,10 @@ function setMsg(kind, text, autoClear = true) {
   }
 }
 
+function syncNeutralRow() {
+  document.getElementById('row-neutral').classList.toggle('disabled', !els.enabled.checked);
+}
+
 async function loadSettings() {
   const obj = await chrome.storage.local.get(STORAGE_KEY);
   const s = obj[STORAGE_KEY] || DEFAULTS;
@@ -110,9 +114,11 @@ async function applySettings() {
 
 // Wire up events
 els.apply.addEventListener('click', applySettings);
+els.enabled.addEventListener('change', syncNeutralRow);
 
 // Boot
 (async () => {
   await loadSettings();
+  syncNeutralRow();
   await probeStatus();
 })();
