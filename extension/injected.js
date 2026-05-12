@@ -80,46 +80,104 @@
     } catch (_) { return null; }
   }
 
-  function ownerColorHex(self) {
-    try { return self.gameObject.owner.color.asHex(); }
-    catch (_) { return '#ffffff'; }
-  }
-
   function buildLabel(self) {
     const name = resolveName(self);
     if (!name) return null;
-    const lbl = new state.DebugLabel(name, ownerColorHex(self), self.camera);
-    lbl.create3DObject();
-    const o = lbl.get3DObject();
-    if (o) {
-      o.renderOrder = 999998;
-      o.userData.__unameLbl = true;
+
+    const team = resolveTeam(self);
+    const bgColor = (team === 'enemy') ? 'rgba(160,0,0,0.88)' : 'rgba(0,50,160,0.88)';
+
+    // Build canvas texture (mirrors DebugLabel.createTexture with backgroundColor)
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 0;
+    const ctx = canvas.getContext('2d');
+    let y = 0;
+    for (const line of name.split('\n')) {
+      const metrics = state.CanvasUtils.drawText(ctx, line, 0, y, {
+        color: 'white',
+        backgroundColor: bgColor,
+        outlineColor: 'rgba(0,0,0,0.45)',
+        outlineWidth: 1,
+        fontFamily: "'Fira Sans Condensed', Arial, sans-serif",
+        fontSize: 10,
+        fontWeight: '400',
+        paddingTop: 3,
+        paddingBottom: 3,
+        paddingLeft: 5,
+        paddingRight: 5,
+        autoEnlargeCanvas: true,
+      });
+      y += metrics.height;
     }
-    return lbl;
+
+    // Shift content 1px (same post-processing as DebugLabel)
+    const w = canvas.width, h = canvas.height;
+    const imgData = ctx.getImageData(0, 0, w, h);
+    canvas.width += 1;
+    canvas.height += 1;
+    ctx.putImageData(imgData, 1, 1);
+
+    const tex = new THREE.Texture(canvas);
+    tex.minFilter = THREE.NearestFilter;
+    tex.magFilter = THREE.NearestFilter;
+    tex.needsUpdate = true;
+    tex.flipY = true;
+
+    // Sprite geometry (same params as DebugLabel.createMesh)
+    const Coords = state.Coords;
+    const geom = state.SpriteUtils.createSpriteGeometry({
+      texture: tex,
+      camera: self.camera,
+      align: { x: 0, y: -1 },
+      offset: { x: 0, y: Coords.ISO_TILE_SIZE / 4 },
+      scale: Coords.ISO_WORLD_SCALE,
+    });
+    const mat = new THREE.MeshBasicMaterial({
+      map: tex,
+      side: THREE.DoubleSide,
+      transparent: true,
+      depthTest: false,
+      flatShading: true,
+    });
+    const mesh = new THREE.Mesh(geom, mat);
+    mesh.matrixAutoUpdate = false;
+    mesh.renderOrder = 999998;
+    mesh.userData.__unameLbl = true;
+
+    return {
+      _team: team,
+      get3DObject() { return mesh; },
+      dispose() { tex.dispose(); mat.dispose(); geom.dispose(); },
+    };
   }
 
   function attachLabel(self) {
     if (!self.rootObj || self.__unameLbl) return;
     const lbl = buildLabel(self);
     if (!lbl) return;
-    self.__unameLbl = lbl;
-    self.__unameLblText = resolveName(self);
+    self.__unameLbl      = lbl;
+    self.__unameLblText  = resolveName(self);
     self.__unameLblOwner = self.gameObject && self.gameObject.owner;
+    self.__unameLblTeam  = lbl._team;
     self.rootObj.add(lbl.get3DObject());
   }
 
   function refreshLabel(self) {
     if (!self.rootObj) return;
-    const newName = resolveName(self);
+    const newName  = resolveName(self);
     const newOwner = self.gameObject && self.gameObject.owner;
-    if (newName === self.__unameLblText && newOwner === self.__unameLblOwner) return;
+    const newTeam  = resolveTeam(self);
+    if (newName === self.__unameLblText &&
+        newOwner === self.__unameLblOwner &&
+        newTeam === self.__unameLblTeam) return;
     if (self.__unameLbl) {
       self.rootObj.remove(self.__unameLbl.get3DObject());
       self.__unameLbl.dispose();
       self.__unameLbl = null;
     }
-    self.__unameLblText = newName;
+    self.__unameLblText  = newName;
     self.__unameLblOwner = newOwner;
+    self.__unameLblTeam  = newTeam;
     if (newName) {
       const lbl = buildLabel(self);
       if (lbl) { self.__unameLbl = lbl; self.rootObj.add(lbl.get3DObject()); }
