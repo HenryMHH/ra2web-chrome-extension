@@ -92,6 +92,33 @@ main {
   pointer-events: none;
 }
 
+.row-select {
+  align-items: center;
+  cursor: default;
+}
+
+.row-select select {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 4px;
+  padding: 3px 8px;
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.row-select select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+#row-fontsize.disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
 .actions {
   padding: 8px 10px 4px;
   display: flex;
