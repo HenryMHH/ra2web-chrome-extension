@@ -80,8 +80,8 @@ async function probeStatus() {
       els.apply.disabled = false;
       return res;
     }
-    if (res.enabled) setStatus('ok', '已啟用');
-    else            setStatus('ok', '已連線');
+    if (res.enabled || res.showIndicators) setStatus('ok', '已啟用');
+    else                                    setStatus('ok', '已連線');
     els.apply.disabled = false;
     return res;
   } catch (e) {

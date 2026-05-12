@@ -16,7 +16,6 @@
 
   const state = {
     PipOverlay: null,
-    DebugLabel: null,
     CanvasUtils: null,
     SpriteUtils: null,
     Coords: null,
@@ -38,15 +37,13 @@
     if (state.PipOverlay && state.CanvasUtils) return true;
     if (typeof System === 'undefined' || !System.import) return false;
     try {
-      const [P, L, CU, SU, CO] = await Promise.all([
+      const [P, CU, SU, CO] = await Promise.all([
         System.import('engine/renderable/entity/PipOverlay'),
-        System.import('engine/renderable/entity/unit/DebugLabel'),
         System.import('engine/gfx/CanvasUtils'),
         System.import('engine/gfx/SpriteUtils'),
         System.import('game/Coords'),
       ]);
       state.PipOverlay  = P.PipOverlay;
-      state.DebugLabel  = L.DebugLabel;
       state.CanvasUtils = CU.CanvasUtils;
       state.SpriteUtils = SU.SpriteUtils;
       state.Coords      = CO.Coords;
@@ -324,7 +321,7 @@
 
         const sx = (_tmpV3.x + 1) / 2 * W;
         const sy = (-_tmpV3.y + 1) / 2 * H;
-        if (sx >= 0 && sx <= W && sy >= 0 && sy <= H) continue;
+        if (sx >= MARGIN && sx <= W - MARGIN && sy >= MARGIN && sy <= H - MARGIN) continue;
 
         // Direction from viewport centre toward unit
         const cx = W / 2, cy = H / 2;
@@ -397,9 +394,10 @@
     return {
       injected: true,
       patched: state.patched,
-      classesReady: !!(state.PipOverlay && state.CanvasUtils),
+      classesReady: !!(state.PipOverlay && state.CanvasUtils && state.SpriteUtils && state.Coords),
       enabled: state.enabled,
       labelExisting: state.labelExisting,
+      showIndicators: state.showIndicators,
       systemAvailable: typeof System !== 'undefined' && !!System.import,
       threeAvailable: typeof THREE !== 'undefined' && !!THREE.WebGLRenderer,
     };
