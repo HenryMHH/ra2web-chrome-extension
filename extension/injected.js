@@ -50,7 +50,7 @@
       state.CanvasUtils = CU.CanvasUtils;
       state.SpriteUtils = SU.SpriteUtils;
       state.Coords      = CO.Coords;
-      return !!(state.PipOverlay && state.CanvasUtils);
+      return !!(state.PipOverlay && state.CanvasUtils && state.SpriteUtils && state.Coords);
     } catch (e) {
       warn('System.import failed:', e); return false;
     }
@@ -230,7 +230,7 @@
     return {
       injected: true,
       patched: state.patched,
-      classesReady: !!(state.PipOverlay && state.DebugLabel),
+      classesReady: !!(state.PipOverlay && state.CanvasUtils),
       enabled: state.enabled,
       labelExisting: state.labelExisting,
       systemAvailable: typeof System !== 'undefined' && !!System.import,
