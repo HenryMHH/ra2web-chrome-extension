@@ -154,11 +154,7 @@
   function shouldShowLabel(self) {
     if (!state.enabled) return false;
     const team = resolveTeam(self);
-    if (team === 'neutral') {
-      if (!state.showNeutral) return false;
-      const rules = self.gameObject && self.gameObject.rules;
-      if (rules && rules.insignificant) return false;
-    }
+    if (team === 'neutral' && !state.showNeutral) return false;
     return true;
   }
 
