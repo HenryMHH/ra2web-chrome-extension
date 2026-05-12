@@ -85,7 +85,9 @@
     if (!name) return null;
 
     const team = resolveTeam(self);
-    const bgColor = (team === 'enemy') ? 'rgba(160,0,0,0.88)' : 'rgba(0,50,160,0.88)';
+    const bgColor = team === 'enemy' ? 'rgba(160,0,0,0.88)'
+                  : team === 'unknown' ? 'rgba(70,70,70,0.88)'
+                  : 'rgba(0,50,160,0.88)';
 
     // Build canvas texture (mirrors DebugLabel.createTexture with backgroundColor)
     const canvas = document.createElement('canvas');
@@ -137,7 +139,6 @@
       side: THREE.DoubleSide,
       transparent: true,
       depthTest: false,
-      flatShading: true,
     });
     const mesh = new THREE.Mesh(geom, mat);
     mesh.matrixAutoUpdate = false;
@@ -191,6 +192,7 @@
     self.__unameLbl = null;
     self.__unameLblText = undefined;
     self.__unameLblOwner = undefined;
+    self.__unameLblTeam = undefined;
   }
 
   function patchPrototype() {
