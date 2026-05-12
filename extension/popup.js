@@ -7,13 +7,14 @@ const els = {
   status: $('status'),
   enabled: $('enabled'),
   chkNeutral: $('chk-neutral'),
+  selFontSize: $('sel-fontsize'),
   chkIndicators: $('chk-indicators'),
   apply: $('apply'),
   msg: $('msg'),
 };
 
 const STORAGE_KEY = 'ra2NamesSettings';
-const DEFAULTS = { enabled: false, showNeutral: false, showIndicators: false };
+const DEFAULTS = { enabled: false, showNeutral: false, showIndicators: false, fontSize: 14 };
 
 function setStatus(kind, text) {
   els.status.className = 'status status-' + kind;
@@ -32,8 +33,10 @@ function setMsg(kind, text, autoClear = true) {
   }
 }
 
-function syncNeutralRow() {
-  document.getElementById('row-neutral').classList.toggle('disabled', !els.enabled.checked);
+function syncLabelRows() {
+  const on = els.enabled.checked;
+  document.getElementById('row-neutral').classList.toggle('disabled', !on);
+  document.getElementById('row-fontsize').classList.toggle('disabled', !on);
 }
 
 async function loadSettings() {
@@ -41,6 +44,7 @@ async function loadSettings() {
   const s = obj[STORAGE_KEY] || DEFAULTS;
   els.enabled.checked       = !!s.enabled;
   els.chkNeutral.checked    = !!s.showNeutral;
+  els.selFontSize.value     = String(s.fontSize ?? 14);
   els.chkIndicators.checked = !!s.showIndicators;
 }
 
@@ -49,6 +53,7 @@ async function saveSettings() {
     enabled:        els.enabled.checked,
     showNeutral:    els.chkNeutral.checked,
     showIndicators: els.chkIndicators.checked,
+    fontSize:       Number(els.selFontSize.value),
   };
   await chrome.storage.local.set({ [STORAGE_KEY]: s });
   return s;
@@ -114,11 +119,11 @@ async function applySettings() {
 
 // Wire up events
 els.apply.addEventListener('click', applySettings);
-els.enabled.addEventListener('change', syncNeutralRow);
+els.enabled.addEventListener('change', syncLabelRows);
 
 // Boot
 (async () => {
   await loadSettings();
-  syncNeutralRow();
+  syncLabelRows();
   await probeStatus();
 })();
