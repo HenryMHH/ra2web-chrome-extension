@@ -97,6 +97,10 @@ main {
   cursor: default;
 }
 
+.row-select:hover {
+  background: transparent;
+}
+
 .row-select select {
   background: var(--bg-elev);
   border: 1px solid var(--border);
