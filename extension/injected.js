@@ -407,7 +407,7 @@
               ctx.lineWidth = 1;
               ctx.strokeRect(lx, ly, lw, lh);
               ctx.fillStyle = 'white';
-              ctx.fillText(goName, ex, ly + PY);
+              ctx.fillText(goName, lx + lw / 2, ly + PY);
               ctx.restore();
             }
           } catch (_) { /* skip bad go */ }
