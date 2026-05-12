@@ -278,24 +278,116 @@
     });
   }
 
+  function initOverlay() {
+    if (state.overlayCanvas) return;
+    const canvas = document.createElement('canvas');
+    canvas.style.cssText = 'position:fixed;top:0;left:0;pointer-events:none;z-index:9999;';
+    document.body.appendChild(canvas);
+    state.overlayCanvas = canvas;
+    state.overlayCtx    = canvas.getContext('2d');
+  }
+
+  function removeOverlay() {
+    if (state.rafId) { cancelAnimationFrame(state.rafId); state.rafId = null; }
+    if (state.overlayCanvas) {
+      state.overlayCanvas.remove();
+      state.overlayCanvas = null;
+      state.overlayCtx    = null;
+    }
+  }
+
+  const _tmpV3 = new THREE.Vector3();
+
+  function drawIndicators() {
+    state.rafId = requestAnimationFrame(drawIndicators);
+    if (!state.showIndicators || !state.overlayCanvas || !state.activeCamera) return;
+
+    const canvas = state.overlayCanvas;
+    const ctx    = state.overlayCtx;
+    const W = window.innerWidth;
+    const H = window.innerHeight;
+    if (canvas.width !== W)  canvas.width  = W;
+    if (canvas.height !== H) canvas.height = H;
+    ctx.clearRect(0, 0, W, H);
+
+    const camera     = state.activeCamera;
+    const MARGIN     = 24;   // px inset from the viewport edge
+    const ARROW_HALF = 10;   // half-length of arrow head
+
+    for (const pip of state.enemyInstances) {
+      try {
+        if (!pip.rootObj || (pip.gameObject && pip.gameObject.isDestroyed)) continue;
+        pip.rootObj.getWorldPosition(_tmpV3);
+        _tmpV3.project(camera); // → NDC in [-1, 1]
+
+        const sx = (_tmpV3.x + 1) / 2 * W;
+        const sy = (-_tmpV3.y + 1) / 2 * H;
+        if (sx >= MARGIN && sx <= W - MARGIN && sy >= MARGIN && sy <= H - MARGIN) continue;
+
+        // Direction from viewport centre toward unit
+        const cx = W / 2, cy = H / 2;
+        const angle = Math.atan2(sy - cy, sx - cx);
+        const cos = Math.cos(angle), sin = Math.sin(angle);
+
+        // Edge intersection: scale direction to reach the inset border
+        const scaleX = (cos !== 0) ? (W / 2 - MARGIN) / Math.abs(cos) : Infinity;
+        const scaleY = (sin !== 0) ? (H / 2 - MARGIN) / Math.abs(sin) : Infinity;
+        const scale  = Math.min(scaleX, scaleY);
+        const ex = cx + cos * scale;
+        const ey = cy + sin * scale;
+
+        // Draw filled arrow pointing toward unit
+        ctx.save();
+        ctx.translate(ex, ey);
+        ctx.rotate(angle);
+        ctx.beginPath();
+        ctx.moveTo(ARROW_HALF, 0);
+        ctx.lineTo(-ARROW_HALF, -ARROW_HALF * 0.6);
+        ctx.lineTo(-ARROW_HALF * 0.4, 0);
+        ctx.lineTo(-ARROW_HALF, ARROW_HALF * 0.6);
+        ctx.closePath();
+        ctx.fillStyle   = 'rgba(210,30,30,0.9)';
+        ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+        ctx.lineWidth   = 1.5;
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+      } catch (_) { /* skip bad instance */ }
+    }
+  }
+
   // ---------------------------------------------------------------------------
   // Public commands, called from the content script via postMessage
   // ---------------------------------------------------------------------------
-  async function apply({ enabled, labelExisting }) {
-    state.enabled = !!enabled;
-    state.labelExisting = !!labelExisting;
-    if (state.enabled) {
+  async function apply({ enabled, labelExisting, showIndicators }) {
+    state.enabled        = !!enabled;
+    state.labelExisting  = !!labelExisting;
+    state.showIndicators = !!showIndicators;
+
+    const needPatch = state.enabled || state.showIndicators;
+    if (needPatch) {
       const ok = await loadClasses();
       if (!ok) return { ok: false, error: 'modules not available' };
       patchPrototype();
-      log('apply: enabled, labelExisting=' + state.labelExisting);
-    } else {
-      // disabled: keep the patch in place but it becomes a no-op (cheap),
-      // and sweep visible labels off the field for instant feedback.
-      await sweepLeftoverLabels();
-      log('apply: disabled, swept labels');
     }
-    return { ok: true, state: { enabled: state.enabled, labelExisting: state.labelExisting } };
+
+    if (state.enabled) {
+      log('apply: labels enabled, labelExisting=' + state.labelExisting);
+    } else {
+      await sweepLeftoverLabels();
+      log('apply: labels disabled, swept');
+    }
+
+    if (state.showIndicators) {
+      initOverlay();
+      if (!state.rafId) drawIndicators();
+      log('apply: indicators enabled');
+    } else {
+      removeOverlay();
+      log('apply: indicators disabled');
+    }
+
+    return { ok: true, state: { enabled: state.enabled, labelExisting: state.labelExisting, showIndicators: state.showIndicators } };
   }
 
   function getStatus() {
