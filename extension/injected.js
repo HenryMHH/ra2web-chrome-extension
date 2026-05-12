@@ -206,6 +206,7 @@
       const ret = state.origCreate.apply(this, arguments);
       try {
         this.__unameLblBornHere = true;
+        this.__unameLblTracked  = true;
         if (!state.activeCamera && this.camera) state.activeCamera = this.camera;
         if (resolveTeam(this) === 'enemy') state.enemyInstances.add(this);
         if (state.enabled) attachLabel(this);
