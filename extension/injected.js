@@ -22,6 +22,7 @@
     enabled: false,
     showNeutral: false,
     showIndicators: false,
+    fontSize: 14,
     patched: false,
     origCreate: null,
     origUpdate: null,
@@ -100,7 +101,7 @@
         outlineColor: 'rgba(0,0,0,0.45)',
         outlineWidth: 1,
         fontFamily: "'Fira Sans Condensed', Arial, sans-serif",
-        fontSize: 10,
+        fontSize: state.fontSize,
         fontWeight: '400',
         paddingTop: 3,
         paddingBottom: 3,
@@ -162,29 +163,33 @@
     if (!self.rootObj || self.__unameLbl) return;
     const lbl = buildLabel(self);
     if (!lbl) return;
-    self.__unameLbl      = lbl;
-    self.__unameLblText  = resolveName(self);
-    self.__unameLblOwner = self.gameObject && self.gameObject.owner;
-    self.__unameLblTeam  = lbl._team;
+    self.__unameLbl         = lbl;
+    self.__unameLblText     = resolveName(self);
+    self.__unameLblOwner    = self.gameObject && self.gameObject.owner;
+    self.__unameLblTeam     = lbl._team;
+    self.__unameLblFontSize = state.fontSize;
     self.rootObj.add(lbl.get3DObject());
   }
 
   function refreshLabel(self) {
     if (!self.rootObj) return;
-    const newName  = resolveName(self);
-    const newOwner = self.gameObject && self.gameObject.owner;
-    const newTeam  = resolveTeam(self);
+    const newName     = resolveName(self);
+    const newOwner    = self.gameObject && self.gameObject.owner;
+    const newTeam     = resolveTeam(self);
+    const newFontSize = state.fontSize;
     if (newName === self.__unameLblText &&
         newOwner === self.__unameLblOwner &&
-        newTeam === self.__unameLblTeam) return;
+        newTeam  === self.__unameLblTeam  &&
+        newFontSize === self.__unameLblFontSize) return;
     if (self.__unameLbl) {
       self.rootObj.remove(self.__unameLbl.get3DObject());
       self.__unameLbl.dispose();
       self.__unameLbl = null;
     }
-    self.__unameLblText  = newName;
-    self.__unameLblOwner = newOwner;
-    self.__unameLblTeam  = newTeam;
+    self.__unameLblText     = newName;
+    self.__unameLblOwner    = newOwner;
+    self.__unameLblTeam     = newTeam;
+    self.__unameLblFontSize = newFontSize;
     if (newName) {
       const lbl = buildLabel(self);
       if (lbl) { self.__unameLbl = lbl; self.rootObj.add(lbl.get3DObject()); }
@@ -195,10 +200,11 @@
     if (!self.__unameLbl) return;
     if (self.rootObj) self.rootObj.remove(self.__unameLbl.get3DObject());
     self.__unameLbl.dispose();
-    self.__unameLbl = null;
-    self.__unameLblText = undefined;
-    self.__unameLblOwner = undefined;
-    self.__unameLblTeam = undefined;
+    self.__unameLbl         = null;
+    self.__unameLblText     = undefined;
+    self.__unameLblOwner    = undefined;
+    self.__unameLblTeam     = undefined;
+    self.__unameLblFontSize = undefined;
   }
 
   function patchPrototype() {
@@ -365,10 +371,12 @@
   // ---------------------------------------------------------------------------
   // Public commands, called from the content script via postMessage
   // ---------------------------------------------------------------------------
-  async function apply({ enabled, showNeutral, showIndicators }) {
+  async function apply({ enabled, showNeutral, showIndicators, fontSize }) {
     state.enabled        = !!enabled;
     state.showNeutral    = !!showNeutral;
     state.showIndicators = !!showIndicators;
+    state.fontSize       = (typeof fontSize === 'number' && fontSize >= 10 && fontSize <= 20)
+                             ? fontSize : 14;
 
     const needPatch = state.enabled || state.showIndicators;
     if (needPatch) {
@@ -378,7 +386,7 @@
     }
 
     if (state.enabled) {
-      log('apply: labels enabled, showNeutral=' + state.showNeutral);
+      log('apply: labels enabled, showNeutral=' + state.showNeutral + ', fontSize=' + state.fontSize);
     } else {
       await sweepLeftoverLabels();
       log('apply: labels disabled, swept');
@@ -394,7 +402,7 @@
       log('apply: indicators disabled');
     }
 
-    return { ok: true, state: { enabled: state.enabled, showNeutral: state.showNeutral, showIndicators: state.showIndicators } };
+    return { ok: true, state: { enabled: state.enabled, showNeutral: state.showNeutral, showIndicators: state.showIndicators, fontSize: state.fontSize } };
   }
 
   function getStatus() {
@@ -405,6 +413,7 @@
       enabled: state.enabled,
       showNeutral: state.showNeutral,
       showIndicators: state.showIndicators,
+      fontSize: state.fontSize,
       systemAvailable: typeof System !== 'undefined' && !!System.import,
       threeAvailable: typeof THREE !== 'undefined' && !!THREE.WebGLRenderer,
     };
