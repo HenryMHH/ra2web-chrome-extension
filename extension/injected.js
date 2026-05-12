@@ -398,8 +398,9 @@
               const tw = ctx.measureText(goName).width;
               const lw = tw + PX * 2;
               const lh = LABEL_FS + PY * 2;
-              const lx = ex - lw / 2;
-              const ly = ey + ARROW_HALF + 4;
+              const lx = Math.max(1, Math.min(ex - lw / 2, W - lw - 1));
+              const lyRaw = ey + ARROW_HALF + 4;
+              const ly = Math.min(lyRaw, H - lh - 1);
               ctx.fillStyle = 'rgba(210,30,30,0.9)';
               ctx.fillRect(lx, ly, lw, lh);
               ctx.strokeStyle = 'rgba(255,255,255,0.6)';
