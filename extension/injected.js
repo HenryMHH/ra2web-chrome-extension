@@ -17,28 +17,54 @@
   const state = {
     PipOverlay: null,
     DebugLabel: null,
+    CanvasUtils: null,
+    SpriteUtils: null,
+    Coords: null,
     enabled: false,
     labelExisting: false,
+    showIndicators: false,
     patched: false,
     origCreate: null,
     origUpdate: null,
     origDispose: null,
+    enemyInstances: new Set(),
+    activeCamera: null,
+    overlayCanvas: null,
+    overlayCtx: null,
+    rafId: null,
   };
 
   async function loadClasses() {
-    if (state.PipOverlay && state.DebugLabel) return true;
+    if (state.PipOverlay && state.CanvasUtils) return true;
     if (typeof System === 'undefined' || !System.import) return false;
     try {
-      const [P, L] = await Promise.all([
+      const [P, L, CU, SU, CO] = await Promise.all([
         System.import('engine/renderable/entity/PipOverlay'),
         System.import('engine/renderable/entity/unit/DebugLabel'),
+        System.import('engine/gfx/CanvasUtils'),
+        System.import('engine/gfx/SpriteUtils'),
+        System.import('game/Coords'),
       ]);
-      state.PipOverlay = P.PipOverlay;
-      state.DebugLabel = L.DebugLabel;
-      return !!(state.PipOverlay && state.DebugLabel);
+      state.PipOverlay  = P.PipOverlay;
+      state.DebugLabel  = L.DebugLabel;
+      state.CanvasUtils = CU.CanvasUtils;
+      state.SpriteUtils = SU.SpriteUtils;
+      state.Coords      = CO.Coords;
+      return !!(state.PipOverlay && state.CanvasUtils);
     } catch (e) {
       warn('System.import failed:', e); return false;
     }
+  }
+
+  function resolveTeam(self) {
+    try {
+      const local = self.viewer && self.viewer.value;
+      const owner = self.gameObject && self.gameObject.owner;
+      if (!local || !owner) return 'unknown';
+      if (owner === local) return 'self';
+      if (self.alliances && self.alliances.areAllied(owner, local)) return 'ally';
+      return 'enemy';
+    } catch (_) { return 'unknown'; }
   }
 
   function resolveName(self) {
