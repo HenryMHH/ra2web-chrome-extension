@@ -206,6 +206,8 @@
       const ret = state.origCreate.apply(this, arguments);
       try {
         this.__unameLblBornHere = true;
+        if (!state.activeCamera && this.camera) state.activeCamera = this.camera;
+        if (resolveTeam(this) === 'enemy') state.enemyInstances.add(this);
         if (state.enabled) attachLabel(this);
       } catch (e) { warn('create patch:', e); }
       return ret;
@@ -214,6 +216,13 @@
     P.prototype.update = function () {
       const ret = state.origUpdate ? state.origUpdate.apply(this, arguments) : undefined;
       try {
+        // Lazy-track existing instances (born before patch was applied)
+        if (!this.__unameLblTracked) {
+          this.__unameLblTracked = true;
+          if (!state.activeCamera && this.camera) state.activeCamera = this.camera;
+          if (resolveTeam(this) === 'enemy') state.enemyInstances.add(this);
+        }
+
         if (!state.enabled) return ret;
         const isExisting = !this.__unameLblBornHere;
         if (isExisting && !state.labelExisting) return ret;
@@ -225,8 +234,10 @@
 
     if (state.origDispose) {
       P.prototype.dispose = function () {
-        try { detachLabel(this); }
-        catch (e) { warn('dispose patch:', e); }
+        try {
+          detachLabel(this);
+          state.enemyInstances.delete(this);
+        } catch (e) { warn('dispose patch:', e); }
         return state.origDispose.apply(this, arguments);
       };
     }
