@@ -87,7 +87,7 @@ main {
   margin-top: 1px;
 }
 
-#row-existing.disabled {
+#row-neutral.disabled {
   opacity: 0.5;
   pointer-events: none;
 }

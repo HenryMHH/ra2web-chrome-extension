@@ -6,15 +6,14 @@ const $ = (id) => document.getElementById(id);
 const els = {
   status: $('status'),
   enabled: $('enabled'),
-  labelExisting: $('labelExisting'),
-  rowExisting: $('row-existing'),
+  chkNeutral: $('chk-neutral'),
   chkIndicators: $('chk-indicators'),
   apply: $('apply'),
   msg: $('msg'),
 };
 
 const STORAGE_KEY = 'ra2NamesSettings';
-const DEFAULTS = { enabled: false, labelExisting: false, showIndicators: false };
+const DEFAULTS = { enabled: false, showNeutral: false, showIndicators: false };
 
 function setStatus(kind, text) {
   els.status.className = 'status status-' + kind;
@@ -33,24 +32,18 @@ function setMsg(kind, text, autoClear = true) {
   }
 }
 
-function updateExistingRow() {
-  if (els.enabled.checked) els.rowExisting.classList.remove('disabled');
-  else els.rowExisting.classList.add('disabled');
-}
-
 async function loadSettings() {
   const obj = await chrome.storage.local.get(STORAGE_KEY);
   const s = obj[STORAGE_KEY] || DEFAULTS;
-  els.enabled.checked = !!s.enabled;
-  els.labelExisting.checked = !!s.labelExisting;
+  els.enabled.checked       = !!s.enabled;
+  els.chkNeutral.checked    = !!s.showNeutral;
   els.chkIndicators.checked = !!s.showIndicators;
-  updateExistingRow();
 }
 
 async function saveSettings() {
   const s = {
-    enabled: els.enabled.checked,
-    labelExisting: els.labelExisting.checked,
+    enabled:        els.enabled.checked,
+    showNeutral:    els.chkNeutral.checked,
     showIndicators: els.chkIndicators.checked,
   };
   await chrome.storage.local.set({ [STORAGE_KEY]: s });
@@ -116,7 +109,6 @@ async function applySettings() {
 }
 
 // Wire up events
-els.enabled.addEventListener('change', updateExistingRow);
 els.apply.addEventListener('click', applySettings);
 
 // Boot
