@@ -557,7 +557,7 @@
     state.enabled           = !!enabled;
     state.showNeutral       = !!showNeutral;
     state.showIndicators    = !!showIndicators;
-    state.enabledCrateTypes = new Set(Array.isArray(enabledCrateTypes) ? enabledCrateTypes.map(Number) : []);
+    state.enabledCrateTypes = new Set(Array.isArray(enabledCrateTypes) ? enabledCrateTypes.map(Number).filter(Number.isFinite) : []);
     state.hiddenUnits       = new Set(Array.isArray(hiddenUnits) ? hiddenUnits.map(s => String(s).toUpperCase()) : []);
     if (typeof fontSize === 'number' && fontSize >= 10 && fontSize <= 20) {
       state.fontSize = fontSize;
