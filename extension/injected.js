@@ -399,7 +399,7 @@
       if (!obj || !obj.tile) continue;
       const powerupType = crate.powerup?.type;
       const label = POWERUP_LABELS[powerupType];
-      if (!label || !state.enabledCrateTypes.has(powerupType)) continue;
+      if (!label || !state.enabledCrateTypes.has(Number(powerupType))) continue;
 
       // Projection math in its own try-catch so errors skip to next crate.
       let sx, sy;
