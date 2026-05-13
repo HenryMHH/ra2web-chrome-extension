@@ -380,7 +380,7 @@
       try {
         for (const go of player.getOwnedObjects()) {
           if (go.isDestroyed || !go.position) continue;
-            if (state.hiddenUnits.size > 0 && state.hiddenUnits.has(go.rules?.name)) continue;
+          if (state.hiddenUnits.size > 0 && state.hiddenUnits.has(go.rules?.name)) continue;
           try {
             const wp = go.position.worldPosition;
             _tmpV3.set(wp.x, wp.y, wp.z);
@@ -451,7 +451,7 @@
     state.enabled        = !!enabled;
     state.showNeutral    = !!showNeutral;
     state.showIndicators = !!showIndicators;
-    state.hiddenUnits    = new Set(Array.isArray(hiddenUnits) ? hiddenUnits : []);
+    state.hiddenUnits    = new Set(Array.isArray(hiddenUnits) ? hiddenUnits.map(s => String(s).toUpperCase()) : []);
     if (typeof fontSize === 'number' && fontSize >= 10 && fontSize <= 20) {
       state.fontSize = fontSize;
     } else {
