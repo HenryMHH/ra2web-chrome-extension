@@ -82,6 +82,13 @@
         state.crateTraitRef = this;
         return origCGTInit.apply(this, arguments);
       };
+      // Fallback: if "Show Crate Contents" is enabled after init already ran (mid-game),
+      // capture the trait ref from spawnCrateAt instead.
+      const origCGTSpawn = CGT.CrateGeneratorTrait.prototype.spawnCrateAt;
+      CGT.CrateGeneratorTrait.prototype.spawnCrateAt = function () {
+        if (!state.crateTraitRef) state.crateTraitRef = this;
+        return origCGTSpawn.apply(this, arguments);
+      };
       return !!(state.PipOverlay && state.CanvasUtils && state.SpriteUtils && state.Coords);
     } catch (e) {
       warn('System.import failed:', e); return false;
