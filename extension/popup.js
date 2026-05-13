@@ -167,7 +167,7 @@ async function loadAndRenderUnitList() {
     if (note)    note.style.display = 'none';
     if (search)  search.style.display = '';
     if (toolbar) toolbar.style.display = '';
-    renderFilterList();
+    renderFilterList(search?.value || '');
   } catch (e) {
     if (note) note.textContent = '無法連線，請重新整理遊戲頁';
   }
