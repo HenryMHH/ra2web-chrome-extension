@@ -36,6 +36,8 @@
     rafId: null,
     sweepPromise: null,
     lastPipUpdateTime: 0,
+    discoveredUnits: new Map(),
+    hiddenUnits: new Set(),
   };
 
   async function loadClasses() {
@@ -176,6 +178,8 @@
     if (!state.enabled) return false;
     const team = resolveTeam(self);
     if (team === 'neutral' && !state.showNeutral) return false;
+    const ruleName = self.gameObject?.rules?.name;
+    if (ruleName && state.hiddenUnits.has(ruleName)) return false;
     return true;
   }
 
@@ -251,6 +255,12 @@
         if (this.alliances) state.alliances    = this.alliances;
         if (this.viewer)    state.viewer       = this.viewer;
         if (this.strings)   state.strings      = this.strings;
+        const ruleName = this.gameObject?.rules?.name;
+        if (ruleName && !state.discoveredUnits.has(ruleName)) {
+          const displayName = resolveName(this) || ruleName;
+          state.discoveredUnits.set(ruleName, displayName);
+          log('unit discovered:', ruleName, '→', displayName);
+        }
         if (shouldShowLabel(this)) attachLabel(this);
       } catch (e) { warn('create patch:', e); }
       return ret;
@@ -370,6 +380,7 @@
       try {
         for (const go of player.getOwnedObjects()) {
           if (go.isDestroyed || !go.position) continue;
+            if (state.hiddenUnits.size > 0 && state.hiddenUnits.has(go.rules?.name)) continue;
           try {
             const wp = go.position.worldPosition;
             _tmpV3.set(wp.x, wp.y, wp.z);
@@ -436,10 +447,11 @@
   // ---------------------------------------------------------------------------
   // Public commands, called from the content script via postMessage
   // ---------------------------------------------------------------------------
-  async function apply({ enabled, showNeutral, showIndicators, fontSize }) {
+  async function apply({ enabled, showNeutral, showIndicators, fontSize, hiddenUnits = [] }) {
     state.enabled        = !!enabled;
     state.showNeutral    = !!showNeutral;
     state.showIndicators = !!showIndicators;
+    state.hiddenUnits    = new Set(Array.isArray(hiddenUnits) ? hiddenUnits : []);
     if (typeof fontSize === 'number' && fontSize >= 10 && fontSize <= 20) {
       state.fontSize = fontSize;
     } else {
@@ -474,6 +486,22 @@
     return { ok: true, state: { enabled: state.enabled, showNeutral: state.showNeutral, showIndicators: state.showIndicators, fontSize: state.fontSize } };
   }
 
+  function getUnitNames() {
+    if (state.strings?.data) {
+      const units = Object.entries(state.strings.data)
+        .filter(([k]) => k.startsWith('name:'))
+        .map(([k, v]) => [k.slice(5).toUpperCase(), v])
+        .sort((a, b) => a[1].localeCompare(b[1], 'zh-Hant'));
+      return { units, source: 'strings' };
+    }
+    if (state.discoveredUnits.size > 0) {
+      const units = [...state.discoveredUnits.entries()]
+        .sort((a, b) => a[1].localeCompare(b[1], 'zh-Hant'));
+      return { units, source: 'discovered' };
+    }
+    return { units: [], source: 'none' };
+  }
+
   function getStatus() {
     return {
       injected: true,
@@ -496,14 +524,22 @@
     if (!msg || msg.__ra2names !== 'cmd') return;
     let result;
     try {
-      if (msg.cmd === 'apply')      result = await apply(msg.opts || {});
-      else if (msg.cmd === 'status') result = getStatus();
-      else                          result = { ok: false, error: 'unknown cmd' };
+      if (msg.cmd === 'apply')          result = await apply(msg.opts || {});
+      else if (msg.cmd === 'status')    result = getStatus();
+      else if (msg.cmd === 'getUnitNames') result = getUnitNames();
+      else                              result = { ok: false, error: 'unknown cmd' };
     } catch (e) {
       result = { ok: false, error: String(e && e.message || e) };
     }
     window.postMessage({ __ra2names: 'res', id: msg.id, result }, '*');
   });
+
+  // Debug helper: window.__ra2Units() in console prints all discovered units
+  window.__ra2Units = () => {
+    const entries = [...state.discoveredUnits.entries()].sort((a, b) => a[1].localeCompare(b[1]));
+    console.table(Object.fromEntries(entries.map(([k, v]) => [k, { displayName: v }])));
+    return entries;
+  };
 
   // Announce that the page-side is ready
   window.postMessage({ __ra2names: 'ready' }, '*');
