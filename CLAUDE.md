@@ -1,10 +1,16 @@
-# RA2 Web — 加上「單位名稱顯示 + 陣營色 + 畫面外指標」功能的 Chrome Extension 開發紀錄
+# RA2 Web — 單位名稱顯示 / 陣營色 / 畫面外指標 / 寶箱內容 / 單位篩選 — Chrome Extension 開發紀錄
 
 ## 背景
 
-目標:在 ra2web / Chrono Divide(一款用 three.js + canvas 在瀏覽器執行的 RA2 復刻版)的每個單位上方,加上該單位的名稱(陣營色底、白字);並在 viewport 邊緣顯示指向畫面外敵方單位的紅色箭頭指標。不能改原始檔,只能從外部用 Chrome Extension 注入。
+目標：在 ra2web / Chrono Divide(用 three.js + canvas 在瀏覽器執行的 RA2 復刻版)中,以 Chrome Extension 的方式注入下列功能,完全不修改原始檔:
 
-來源檔案:`ra2web_min.js`,4.2MB / 9.6 萬行 minified JS。
+1. 每個單位上方顯示**名稱標籤**(陣營色底、白字)
+2. viewport 邊緣顯示**畫面外敵方單位指標**(紅色箭頭 + 名稱)
+3. 地圖上顯示**寶箱內容物**(中文標籤)
+4. 依單位類型**過濾**要顯示哪些 label(custom / preset 兩種模式)
+5. 標籤**字體大小**可調
+
+來源檔案:`ra2web.min.js`,~4.2MB / ~9.6 萬行 minified JS。
 
 ---
 
@@ -12,8 +18,7 @@
 
 ### 模組系統
 
-整個 bundle 用 **SystemJS (`System.register`)** 包裝,且**保留完整模組名稱**,所以雖然 minified 但結構非常清楚。
-每個模組長這樣:
+整個 bundle 用 **SystemJS (`System.register`)** 包裝,且**保留完整模組名稱**,所以雖然 minified 但結構非常清楚。每個模組長這樣:
 
 ```js
 System.register("engine/renderable/entity/PipOverlay", [deps...], function(e, t) {
@@ -27,103 +32,167 @@ System.register("engine/renderable/entity/PipOverlay", [deps...], function(e, t)
 | -------- | --------------------------- | -------------------------------------- |
 | 遊戲邏輯 | `game/gameobject/`          | 純資料/狀態,不碰 three.js              |
 | 渲染     | `engine/renderable/entity/` | three.js 物件,每種 gameobject 對應一個 |
+| 玩法 trait | `game/trait/`             | 全局邏輯模組,例如 CrateGeneratorTrait  |
 
 主要 renderable:
 
-- `engine/renderable/entity/Building`(line 48460)
-- `engine/renderable/entity/Vehicle`(line 49591)
-- `engine/renderable/entity/Infantry`(line 51316)
-- `engine/renderable/entity/Aircraft`(line 51752)
-- 全部由 `engine/renderable/entity/RenderableFactory`(line 55389)集中產生
+- `engine/renderable/entity/Building`
+- `engine/renderable/entity/Vehicle`
+- `engine/renderable/entity/Infantry`
+- `engine/renderable/entity/Aircraft`
+- 由 `engine/renderable/entity/RenderableFactory` 集中產生
 
-### 關鍵發現:`PipOverlay`(line 46498)
+### 關鍵類別
 
-`PipOverlay` 是「掛在每個單位身上的 HUD 覆蓋層」,負責畫:
+#### `PipOverlay` — 單位 HUD overlay
 
-- 血條、選取框、載運 pip、控制群組數字、老兵階級、集合點線、施法進度條
-- **`DebugLabel`** ← 這個直接就是「在單位上方畫文字」的現成範本
+掛在每個單位身上的 HUD 覆蓋層,負責畫血條、選取框、載運 pip、控制群組數字、老兵階級、集合點線、施法進度條。
 
 `PipOverlay` 的 root 是一個 `THREE.Object3D`(`this.rootObj`,名稱 `"pip_overlay"`),所有元件當 child 加進去。
 
-### 完美範本:`DebugLabel`(line 46161)
+constructor 注入的依賴(實例屬性):
+- `this.gameObject` — 對應的 gameObject(`.rules`, `.owner`, `.position`...)
+- `this.camera` — 主鏡頭
+- `this.viewer` — `{ value: localPlayer }`
+- `this.alliances` — alliance manager,有 `areAllied(a, b)` / `playerList.players`
+- `this.strings` — i18n,有 `.get(key)` 和 `.data`
+- `this.rootObj` — `pip_overlay` Object3D
 
-完整實作了「文字 sprite billboard」:
+#### `DebugLabel` — 文字 sprite billboard 範本
 
-1. **`createTexture(text, color, outline)`**:開個 `<canvas>`,用 `CanvasUtils.drawText` 把文字畫上去(含描邊、padding),包成 `THREE.Texture`
-2. **`createMesh(texture)`**:`SpriteUtils.createSpriteGeometry` 建一個永遠面向相機的 sprite,材質 `MeshBasicMaterial({ depthTest: !1, transparent: !0 })` — `depthTest:!1` 確保不會被單位本體擋住
+`PipOverlay` 內部 debug 模式使用的「在單位上方畫文字」實作:
 
-`PipOverlay` 已經有現成的掛 `DebugLabel` 邏輯(line 46681),只是僅在 debug 模式開啟時用。
+1. `createTexture(text, ...)`:開個 `<canvas>`,用 `CanvasUtils.drawText` 把文字畫上去(含描邊、padding),包成 `THREE.Texture`
+2. `createMesh(texture)`:`SpriteUtils.createSpriteGeometry` 建一個永遠面向相機的 sprite,材質 `MeshBasicMaterial({ depthTest: !1, transparent: !0 })` —— `depthTest:!1` 確保不會被單位本體擋住
 
 > **注意**:最終實作**不使用** `DebugLabel` class,改直接呼叫 `CanvasUtils.drawText` 並傳入 `backgroundColor` 自訂色底,以達成陣營色效果。
+
+#### `CrateGeneratorTrait` — 寶箱管理 trait
+
+`game/trait/CrateGeneratorTrait` 持有當前場上所有寶箱:
+
+- `this.crates` — 寶箱 array,每個 `{ obj, powerup }`
+- `crate.obj.position.worldPosition` / `crate.obj.tile` — 位置
+- `crate.powerup.type` — powerup type id(數字)
+- `init(game)` — 每局開始時呼叫一次
+- `spawnCrateAt(...)` — 新寶箱誕生時呼叫
 
 ### 取得「單位名稱」的路徑
 
 ```js
-gameObject.rules.uiName; // i18n key
-strings.get(rules.uiName); // 本地化後的顯示文字
+gameObject.rules.uiName;       // i18n key,例如 "name:E1"
+strings.get(rules.uiName);     // 本地化後的顯示文字
+strings.data;                  // 整份 i18n table,key 形如 "name:E1"
 ```
 
-`PipOverlay` constructor 第 10 個參數 `c` 就是 `this.strings`(line 46611)。
+### 取得「玩家列表」(掃描畫面外敵人用)
+
+```js
+pip.alliances.playerList.players  // 全部玩家
+player.isNeutral                  // 是否中立
+player.getOwnedObjects()          // 所擁有的 gameObjects
+go.position.worldPosition         // 3D 世界座標
+go.isDestroyed                    // 已死亡
+```
 
 ---
 
-## 二、注入策略演進
+## 二、注入策略
 
-### 嘗試 1:Hook `System.register`(失敗)
+### 為什麼用 `System.import` 而非 wrap `System.register`
 
-想在 SystemJS 載入模組時攔截,wrap `System.register` 把目標模組的 export 換成捕捉版。
-
-**問題**:
-
-- 遊戲已載入完才貼到 console → hook 安裝太晚,所有模組都 register 完了
-- 動到 `System.register` 本身會觸發 SystemJS 內建保護,丟出:
-  ```
-  system.js:5 Uncaught TypeError: Invalid System.register call.
-  Anonymous System.register calls can only be made by modules loaded by
-  SystemJS.import and not via script tags.
-  ```
-
-### 嘗試 2:`System.import`(成功)
-
-SystemJS 公開 API `System.import(moduleName)`:
-
-- 對**已執行**的模組:直接從 cache 回傳 namespace
-- 完全唯讀,不觸發 anonymous register 檢查
-- 任何時間都可以用,不依賴 `document_start`
-
-```js
-const [PipModule, CU, SU, CO] = await Promise.all([
-  System.import("engine/renderable/entity/PipOverlay"),
-  System.import("engine/gfx/CanvasUtils"),
-  System.import("engine/gfx/SpriteUtils"),
-  System.import("game/Coords"),
-]);
-const PipOverlay   = PipModule.PipOverlay;
-const CanvasUtils  = CU.CanvasUtils;
-const SpriteUtils  = SU.SpriteUtils;
-const Coords       = CO.Coords;
+Wrap `System.register` 會觸發 SystemJS anonymous register 防護:
+```
+Uncaught TypeError: Invalid System.register call.
+Anonymous System.register calls can only be made by modules loaded by
+SystemJS.import and not via script tags.
 ```
 
-拿到 class 後,改 prototype 對所有現有/未來的 instance 都生效。
+且時機難以掌握(content_script `document_idle` 注入時遊戲模組多半已 register 完)。
+
+改用公開 API `System.import(moduleName)`:
+- 對**已執行**的模組:直接從 cache 回傳 namespace
+- 完全唯讀,不觸發 anonymous register 檢查
+- 任何時間都可以用
+
+```js
+const [P, CU, SU, CO, CGT] = await Promise.all([
+  System.import('engine/renderable/entity/PipOverlay'),
+  System.import('engine/gfx/CanvasUtils'),
+  System.import('engine/gfx/SpriteUtils'),
+  System.import('game/Coords'),
+  System.import('game/trait/CrateGeneratorTrait'),
+]);
+```
+
+### Eager patch
+
+injected.js 載入即執行 `loadClasses().then(patchPrototype)`,**不等 popup 「套用」**。如此即使使用者在開局後才打開 popup 啟用功能,所有開局時就生成的單位 PipOverlay 也已經被 patch 過、登錄到 `pipInstances`,可以在 `apply()` 時立即 sweep 補標籤。
+
+### 取得 trait 的 ref
+
+`CrateGeneratorTrait` 在 prototype 上掛兩個攔截:
+
+```js
+CGT.prototype.init = function (game) {
+  state.crateTraitRef = this;           // 標準路徑
+  state.discoveredUnits.clear();         // 換局時清空已發現單位
+  return origInit.apply(this, arguments);
+};
+CGT.prototype.spawnCrateAt = function () {
+  if (!state.crateTraitRef) state.crateTraitRef = this;  // 開局後才啟用的 fallback
+  return origSpawn.apply(this, arguments);
+};
+```
 
 ---
 
 ## 三、Patch 邏輯
 
-### 陣營判斷
+### 三個 method 要 patch
 
-`PipOverlay` 每個 instance 有:
-- `this.viewer.value` → localPlayer
-- `this.gameObject.owner` → 單位所屬玩家
-- `this.alliances.areAllied(owner, local)` → 是否盟友
+```js
+PipOverlay.prototype.create3DObject  // 新單位建立 → 登錄 instance + attach label
+PipOverlay.prototype.update          // 每幀 → 依設定 attach/refresh/detach
+PipOverlay.prototype.dispose         // 單位移除 → detach + 從 pipInstances 移除
+```
+
+### 全局狀態 (`state`)
+
+```js
+state = {
+  // 類別參考(loadClasses 後填入)
+  PipOverlay, CanvasUtils, SpriteUtils, Coords, crateTraitRef,
+
+  // 從 instance 採集的全局物件(供 overlay 計算用)
+  activeCamera, alliances, viewer, strings,
+
+  // 使用者設定
+  enabled, showNeutral, showIndicators,
+  enabledCrateTypes: Set<number>,
+  fontSize,
+  hiddenUnits: Set<string>,    // 大寫 rule name
+
+  // 內部追蹤
+  patched: bool,
+  pipInstances: Set<PipOverlay>,         // 所有活著的 instance
+  discoveredUnits: Map<ruleName, displayName>,
+  lastPipUpdateTime: number,             // 偵測遊戲已結束
+  overlayCanvas, overlayCtx, rafId,      // 覆蓋層
+  origCreate, origUpdate, origDispose,   // 原始 method
+};
+```
+
+### 陣營判斷
 
 ```js
 function resolveTeam(self) {
-  const local = self.viewer && self.viewer.value;
-  const owner = self.gameObject && self.gameObject.owner;
+  const local = self.viewer?.value;
+  const owner = self.gameObject?.owner;
   if (!local || !owner) return 'unknown';
+  if (owner.isNeutral) return 'neutral';
   if (owner === local) return 'self';
-  if (self.alliances && self.alliances.areAllied(owner, local)) return 'ally';
+  if (self.alliances?.areAllied(owner, local)) return 'ally';
   return 'enemy';
 }
 ```
@@ -134,77 +203,147 @@ function resolveTeam(self) {
 |------|----------------|
 | `enemy` | `rgba(160,0,0,0.88)` 紅底 |
 | `self` / `ally` | `rgba(0,50,160,0.88)` 藍底 |
+| `neutral` | `rgba(0,130,50,0.88)` 綠底 |
 | `unknown` | `rgba(70,70,70,0.88)` 灰底 |
 
-白字(`color: 'white'`),直接傳給 `CanvasUtils.drawText`。
+白字(`color: 'white'`),outline 半透明黑色。
 
-### 三個 method 要 patch
+### Label 建立流程 (`buildLabel`)
 
-```js
-PipOverlay.prototype.create3DObject; // 新單位建立時 → attachLabel + 加入 enemyInstances
-PipOverlay.prototype.update; // 每幀 → refreshLabel(處理 owner / 名稱 / team 變化)
-PipOverlay.prototype.dispose; // 單位移除 → detachLabel + 從 enemyInstances 移除
+1. 拿 displayName(`resolveName`)和 team(`resolveTeam`)
+2. 創建 `<canvas>`,用 `state.CanvasUtils.drawText` 把每一行畫上去(會 autoEnlarge canvas)
+3. 將像素往右下 shift 1px(`putImageData(imgData, 1, 1)`)補一個邊框緩衝,模仿 DebugLabel 的後處理
+4. 包成 `THREE.Texture`(NearestFilter, flipY:true, needsUpdate:true)
+5. 用 `state.SpriteUtils.createSpriteGeometry` 建 sprite geometry(永遠面向相機)
+6. `MeshBasicMaterial({ map, transparent:true, depthTest:false })`,renderOrder 設高(`999998`)蓋在最頂
+7. mesh.userData.`__unameLbl` = true(供之後 sweep 用)
+8. mesh.userData.`__unameLblDisposer` 是 dispose helper
+
+### Label 生命週期
+
+`attachLabel(self)`:
+- 透過 `buildLabel(self)` 建 mesh,加進 `self.rootObj`
+- 在 `self` 上記下 cache:`__unameLbl` / `__unameLblText` / `__unameLblOwner` / `__unameLblTeam` / `__unameLblFontSize`
+
+`refreshLabel(self)`:
+- 比對 cache,**若 name / owner / team / fontSize 任一改變**就 dispose 舊的、重建新的
+- `buildLabel` 失敗(回 null)時,cache 不更新 → 下一幀重試
+
+`detachLabel(self)`:
+- 從 rootObj 移除 + dispose texture/material/geometry
+- 清掉 cache
+
+### `shouldShowLabel(self)` 判斷
+
+```
+state.enabled 必須開
+team === 'neutral' 時 state.showNeutral 必須開
+gameObject.rules.name 必須不在 state.hiddenUnits 中(大寫比對)
 ```
 
-### 區分「新單位」vs「既存單位」
+`update()` patch 每幀檢查;不符就 detach,符合就 attach 或 refresh。
 
-核心 trick:patch 後的 `create3DObject` 會在 `this` 上打標記 `__unameLblBornHere = true`。
+### 既存單位的處理 — `pipInstances` 集合
 
-- 既存單位:`create3DObject` 在 patch 之前跑過,**永遠不會**有這個標記
-- 新單位:有標記
+Eager patch 確保所有 `create3DObject` 呼叫都會把 `this` 加進 `state.pipInstances`。
+為以防萬一 update 看到沒被追蹤的 instance(理論上不該發生)也補登錄。
 
-在 `update()` 裡:
+`apply()` 啟用時:`for (const pip of state.pipInstances) attachLabel(pip)` 立即補標籤,不需等下一幀 update。
 
-```js
-const isExisting = !this.__unameLblBornHere;
-if (isExisting && !state.labelExisting) return; // opt-out 既存單位
-```
+### Label 移除(關閉功能時)— `sweepLeftoverLabels`
 
-這樣就能乾淨地讓使用者選擇要不要標示既存單位。
+每個 label mesh 都打 `userData.__unameLbl = true`。需要清理時:
 
-### Label 移除策略
-
-每個 label 的 Object3D 都打上 `userData.__unameLbl = true`。需要清理時:
-
-- 借 `THREE.WebGLRenderer.prototype.render` 一個 frame 拿到 scene
-- `scene.traverse(o => userData.__unameLbl && parent.remove(o))`
-
-### 畫面外敵人指標
-
-`state.enemyInstances`(Set)追蹤所有敵方 PipOverlay instance。
-
-每 RAF frame:
-1. 對每個 enemy instance:呼叫 `pip.rootObj.getWorldPosition(_tmpV3)` 取 3D 世界座標
-2. `_tmpV3.project(camera)` → NDC → 換算 screen pixel `(sx, sy)`
-3. 若 `sx`/`sy` 在 `MARGIN=24px` 範圍內 → 已在畫面內,跳過
-4. 否則從 viewport 中心向單位方向畫實心箭頭,貼在 viewport 邊緣
-
-```js
-const angle = Math.atan2(sy - cy, sx - cx);
-// edge intersection via min(scaleX, scaleY)
-ctx.fillStyle = 'rgba(210,30,30,0.9)';
-```
-
-覆蓋層用 `position:fixed;pointer-events:none;z-index:9999` canvas 疊在最頂。
+1. 借 `THREE.WebGLRenderer.prototype.render` 一個 frame 拿到 scene
+2. 從 scene 往上找到 root(可能是 group 而非 scene 本身)
+3. `root.traverse(o => userData.__unameLbl && ...)` 收集再移除
+4. 呼叫 `__unameLblDisposer` 釋放 GPU 資源
+5. 超時 2s fallback(避免卡住)
+6. 結束後 `state.sweepPromise = null`(避免並行 sweep)
 
 ---
 
-## 四、最終 Chrome Extension
+## 四、畫面外指標 + 寶箱 overlay
 
-### 檔案結構
+兩者共用同一 canvas(`state.overlayCanvas`)和同一 RAF loop(`drawOverlay`):
+
+```js
+position:fixed; top:0; left:0; pointer-events:none; z-index:9999
+```
+
+每幀:
+1. `state.showIndicators || state.enabledCrateTypes.size > 0` 是否任一啟用,否則停止 RAF
+2. 對 canvas 重設大小、清空
+3. **若 `lastPipUpdateTime` 超過 2s 沒被更新**(代表遊戲已結束/暫停),保持空白不畫(避免畫到死亡座標)
+4. 若 indicators 開:遍歷 `alliances.playerList.players`,過濾非敵方(self / neutral / 盟友)和 `hiddenUnits`,對 enemy 單位 `worldPosition.project(camera)` → 螢幕座標
+   - 若在 viewport 內(扣掉 24px MARGIN)跳過
+   - 否則畫紅色實心箭頭(指向單位)貼在邊緣,並在箭頭旁邊畫單位名稱小標籤
+5. 若 crate types 開:呼叫 `drawCrateLabels`,遍歷 `state.crateTraitRef.crates`
+   - 過濾 `state.enabledCrateTypes` 有勾選的 powerup type
+   - 從 `crate.obj.position.worldPosition`(或 fallback 到 `Coords.tile3dToWorld(tile.rx+0.5, tile.ry+0.5, tile.z)`)取座標,project → 螢幕座標
+   - 在寶箱位置上方畫金色標籤(含 powerup 中文名)
+
+### 寶箱 powerup type → 中文
 
 ```
-ra2-names-ext/
-├── manifest.json
-├── injected.js     (跑在 page MAIN world,做實際 patch)
+0  裝甲↑    1  火力↑    2  基地回復   3  金錢
+4  揭示地圖  5  速度↑    6  老兵升級   7  免費單位
+8  無敵護盾  11 礦石     13 隱形      14 黑暗霧
+15 爆炸     16 核彈     17 燃燒
+```
+
+(對應 `POWERUP_LABELS` 和 popup `CRATE_TYPES`,兩處要同步。)
+
+### 共用 `_tmpV3`
+
+`new THREE.Vector3()` 在模組頂層 eval 時 THREE 還沒準備好。`let _tmpV3 = null` 在 `drawOverlay` 第一次執行才 lazy init,後續每次 iteration 開頭 `.set(...)` 覆寫,所以可重複使用。
+
+---
+
+## 五、單位篩選 (popup-side state)
+
+`popup.js` 維護兩種模式:
+
+| 模式 | 來源 |
+|------|------|
+| `custom` | `hiddenUnitsCustom: Set<ruleName>` — 單場自訂,checkbox 清單 |
+| `preset` | `snapshots[selectedPresetIndex].hiddenUnits` — 從 custom 儲存的快照 |
+
+`getEffectiveHiddenUnits()` 在套用時根據當前 `filterMode` 回傳 list,寫進 `chrome.storage` 的 `hiddenUnits` 欄位,再透過 `apply` 指令傳給 injected.js。
+
+單位清單來源(`getUnitNames` 指令):
+1. 優先用 `state.strings.data`(完整字典),抓 `name:` 開頭的 key
+2. fallback 用 `state.discoveredUnits`(從 `create3DObject` patch 累積)
+3. 都沒有 → 提示「進入對局後單位清單才會出現」
+
+排序:依 displayName,locale `zh-Hant`。
+
+Snapshots 儲存在獨立 key `ra2NamesSnapshots`(陣列),每筆:
+```js
+{ name: '<input> <ISO timestamp>', hiddenUnits: [...], totalCount: number }
+```
+
+---
+
+## 六、Chrome Extension 結構
+
+### 檔案
+
+```
+extension/
+├── manifest.json   (MV3)
+├── background.js   (service worker,僅管 icon 切換)
 ├── content.js      (isolated world,訊息中繼)
+├── injected.js     (MAIN world,實際 patch + overlay)
 ├── popup.html      (UI)
 ├── popup.css
 ├── popup.js
 └── icons/
+    ├── running-{16,32,48,128}.png   (啟用中)
+    └── stopping-{16,32,48,128}.png  (停用中)
 ```
 
-### MV3 三層通訊架構
+### 通訊架構
 
 ```
 popup.html/js  ←—chrome.runtime.sendMessage—→  content.js
@@ -213,30 +352,44 @@ popup.html/js  ←—chrome.runtime.sendMessage—→  content.js
                                                     ↓
                                               injected.js (MAIN world)
                                                     ↓
-                                              SystemJS / THREE
-                                              PipOverlay.prototype
+                                          SystemJS / THREE / PipOverlay.prototype
+                                          CrateGeneratorTrait.prototype
+
+popup.js / content.js  ─chrome.runtime.sendMessage({cmd:'setIcon'})→  background.js
+                                                                          ↓
+                                                                   chrome.action.setIcon
 ```
 
-為什麼三層必要:
+為何三層必要:
+- **popup**:存得到 `chrome.storage`,送得到 `chrome.tabs.sendMessage`,但不在 page 裡
+- **content.js**(isolated world):跟 popup 通訊用 `chrome.runtime`,但看不到 page 的 `System` / `THREE`
+- **injected.js**(MAIN world):看得到 page globals,但用不到 `chrome.*`
+- **background.js**:`chrome.action.setIcon` 在 service worker 比較穩,且 popup 關閉時也能由 content.js 觸發(例如自動 apply 完)
 
-- **popup**:能存 `chrome.storage`、能 `chrome.tabs.sendMessage`,但不在 page 裡
-- **content.js**(isolated world):能跟 popup 通訊,但看不到 page 的 `System` / `THREE`
-- **injected.js**(MAIN world):看得到 page globals,但不能用 `chrome.*` API
+### 指令協定
 
-content script 透過 `<script src=chrome.runtime.getURL('injected.js')>` 把 injected.js 注入 MAIN world(需要 `web_accessible_resources` 宣告)。
+`content.js ↔ injected.js`:`window.postMessage` 每筆帶 `id` / 3 秒 timeout。
+- `apply(opts)` — 套用設定;`opts = { enabled, showNeutral, showIndicators, enabledCrateTypes, fontSize, hiddenUnits }`
+- `status` — 回報目前狀態
+- `getUnitNames` — 列出所有單位 ruleName + displayName
 
-訊息協定:每個 message 帶 `id`、3 秒 timeout 防 hang。
+content.js 收到 injected.js 發出的 `{__ra2names:'ready'}` 後,**自動 apply** 已儲存的設定(若任一功能為 on),並通知 background 切 icon。
 
 ### popup UI
 
-陽春但乾淨的深色介面:
-
-- 主開關「顯示單位名稱」
-- 次開關「也標示既存單位」(主開關關時自動 disable)
-- 次開關「顯示畫面外敵人指標」(獨立 toggle,可與名稱標示分開啟用)
-- 「套用」按鈕
+- **主開關**「顯示單位名稱」
+- 副選項「顯示中立單位」(主開關關閉時 disable)
+- **字體大小**下拉(10 / 12 / 14 / 16 / 18 / 20 px)
+- **指標**「顯示畫面外敵人指標」(獨立開關)
+- **寶箱**摺疊區:15 種 powerup type 的多選 grid,有「全選 / 全不選」
+- **篩選**摺疊區:custom / preset 兩種模式
+  - custom:checkbox 清單 + 搜尋框 + 「全選 / 全不選」 + 「儲存快照」
+  - preset:選一筆快照(顯示 `已顯示/總數`) + 「刪除」
+- **套用**主按鈕(統一觸發)
 - 狀態列(尚未連線 / 已連線 / 已啟用 / 無法連線)
-- 設定用 `chrome.storage.local` 持久化
+- 設定持久化:
+  - `ra2NamesSettings` key — 主設定
+  - `ra2NamesSnapshots` key — 快照陣列
 
 ### manifest.json 重點
 
@@ -244,7 +397,13 @@ content script 透過 `<script src=chrome.runtime.getURL('injected.js')>` 把 in
 {
   "manifest_version": 3,
   "permissions": ["storage", "scripting", "activeTab"],
-  "host_permissions": [...遊戲網域...],
+  "host_permissions": [
+    "https://game.chronodivide.com/*",
+    "https://chronodivide.com/*",
+    "https://*.ra2web.com/*",
+    "https://ra2web.com/*"
+  ],
+  "background": { "service_worker": "background.js" },
   "content_scripts": [{
     "matches": [...],
     "js": ["content.js"],
@@ -260,50 +419,68 @@ content script 透過 `<script src=chrome.runtime.getURL('injected.js')>` 把 in
 
 ---
 
-## 五、行為總表
+## 七、行為總表
 
 ### 名稱標示
 
-| 主開關 | 既存單位開關 | 結果                                 |
-| ------ | ------------ | ------------------------------------ |
-| ON     | OFF          | 新生產的單位有名字;既存單位沒有      |
-| ON     | ON           | 全部都有;既存單位在下個 frame 內長出 |
-| OFF    | —            | 立刻清掉場上所有 label               |
+| 名稱開關 | 中立開關 | 結果 |
+| -------- | -------- | ---- |
+| ON  | ON  | 全部敵/我/盟/中立都有標籤 |
+| ON  | OFF | 中立隱藏,其他都有 |
+| OFF | —   | sweep 場上所有 label |
 
 ### 陣營色
 
 | 陣營 | label 底色 |
 |------|-----------|
 | 敵方 | 紅底 `rgba(160,0,0,0.88)` |
-| 自己/盟友 | 藍底 `rgba(0,50,160,0.88)` |
+| 自己 / 盟友 | 藍底 `rgba(0,50,160,0.88)` |
+| 中立 | 綠底 `rgba(0,130,50,0.88)` |
 | 未知 | 灰底 `rgba(70,70,70,0.88)` |
 
 ### 畫面外指標
 
 | 指標開關 | 結果 |
 |---------|------|
-| ON | viewport 邊緣出現紅色箭頭指向畫面外敵方單位 |
-| OFF | 覆蓋層 canvas 移除,RAF 停止 |
+| ON | viewport 邊緣紅色箭頭 + 單位名稱小標籤,指向畫面外敵方單位(`hiddenUnits` 過濾後) |
+| OFF | 若寶箱也關 → overlay canvas 移除、RAF 停止 |
+
+### 寶箱
+
+| 已勾選 type 數 | 結果 |
+|----------------|------|
+| 0 | 不畫寶箱 label |
+| ≥ 1 | overlay 中以金色標籤標出對應 powerup type 的寶箱位置(中文名) |
+
+### 字體大小
+
+10–20 px。改動會被 `refreshLabel` 比對偵測,所有現存 label 在下一幀重建。
 
 ---
 
-## 六、踩過的坑
+## 八、踩過的坑
 
 1. **`System.register` wrap 會觸發 anonymous register error** — 改用 `System.import` 解決
 2. **Content script 預設在 isolated world,看不到 page 的 `System`/`THREE`** — 需要 `"world": "MAIN"`(Chrome 102+)或注入 `<script>` 標籤
-3. **既存單位無法直接 enumerate** — 因為 PipOverlay 邏輯類沒掛在 scene graph;改用「在 patch 後的 `update()` 第一次跑時判斷標記」的 lazy 策略
-4. **清理殘留 label** — Object3D 加 `userData` 標記,借 `WebGLRenderer.render` hook 一個 frame 拿到 scene 後 traverse 清掉
-5. **`__unameLblTracked` 未在 `create3DObject` 設定** — patch 後新生成的單位每幀重複呼叫 `resolveTeam`;在 `create3DObject` patch 補上 `this.__unameLblTracked = true` 解決
-6. **`new THREE.Vector3()` 在模組頂層執行時 THREE 尚未存在** — 改為 `let _tmpV3 = null` lazy init,在 `drawIndicators` 第一次執行時才建立
-7. **指標開關關閉後 RAF ghost frame** — 在 RAF loop 開頭先檢查 `!state.showIndicators` 再決定是否重新排程
-8. **`getStatus()` 未回傳 `showIndicators`** — popup 狀態顯示邏輯無法正確反映指標狀態;補上後修正
+3. **既存單位無法直接 enumerate** — PipOverlay 邏輯類沒掛在 scene graph;改用「eager patch + `pipInstances` Set」追蹤所有生成過的 instance,`apply()` 時統一 sweep
+4. **清理殘留 label** — Object3D 加 `userData.__unameLbl` 標記,借 `WebGLRenderer.render` hook 一幀拿到 scene 後 traverse 清掉;sweep promise 鎖避免並行
+5. **`new THREE.Vector3()` 在模組頂層執行時 THREE 尚未存在** — 改為 `let _tmpV3 = null` lazy init,在 `drawOverlay` 第一次執行時才建立
+6. **指標開關關閉後 RAF ghost frame** — 在 RAF loop 開頭先檢查 `state.showIndicators || state.enabledCrateTypes.size>0`,否則 `state.rafId=null` 並 return,不再排程下一幀
+7. **遊戲結束後 overlay 仍畫死亡座標** — 在 `update` patch 記錄 `lastPipUpdateTime`,`drawOverlay` 中超過 2s 沒被更新就跳過繪製
+8. **buildLabel 失敗的暫時性錯誤(`strings` 還沒就緒)** — `refreshLabel` 若 `buildLabel` 回 null 不更新 cache,下一幀自動重試
+9. **CrateGeneratorTrait ref 取得時機** — 若使用者在開局後才啟用「寶箱內容」,`init` 已跑過,改在 `spawnCrateAt` 補捕一次 trait ref;換局時 `init` 會清空 `discoveredUnits`
+10. **canvas 自動放大會清空原本像素** — `CanvasUtils.drawText` 的 `autoEnlargeCanvas: true` 會在文字超出時擴大畫布並清空。先 `getImageData` 備份再 `putImageData(imgData, 1, 1)` shift 1px 還原(順便當作描邊預留空間)
+11. **showCrateContents 從 boolean 演進到 enabledCrateTypes 陣列** — popup `loadSettings` 仍處理舊 key migration,把舊的全 on boolean 視為「全部 powerup type 勾選」
+12. **filter 兩種模式儲存設計** — `hiddenUnits` 是執行期最終結果;`hiddenUnitsCustom` 是 custom 模式編輯狀態;`snapshots` 是 preset 來源。三者不要混淆
 
 ---
 
-## 七、可擴充方向
+## 九、可擴充方向
 
 - 熱鍵 toggle(全域 keydown 監聽)
-- 字型大小 / 顏色客製化(調整 `buildLabel` 裡的 `CanvasUtils.drawText` 參數)
-- 只標示某些單位類型(在 `resolveName` 開頭加過濾條件,例如 `if (gameObject.isBuilding()) return null;`)
-- 指標顯示距離或單位數量(在 `drawIndicators` 裡 `ctx.fillText`)
+- 標籤透明度 / 邊框寬度客製化
 - 顯示額外資訊(HP%、距離、coords 等)
+- 寶箱標籤過期時間或 fade-out 動畫
+- 多語系(目前 popup 字串硬編 zh-Hant)
+- 匯入/匯出 snapshots(JSON 檔)
+- 篩選依「類型」(infantry / vehicle / building / aircraft)而非個別 ruleName
