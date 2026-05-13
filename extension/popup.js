@@ -14,7 +14,10 @@ const els = {
 };
 
 const STORAGE_KEY = 'ra2NamesSettings';
-const DEFAULTS = { enabled: false, showNeutral: false, showIndicators: false, fontSize: 14 };
+const DEFAULTS = { enabled: false, showNeutral: false, showIndicators: false, fontSize: 14, hiddenUnits: [] };
+
+let allUnits  = [];   // [[ruleName, displayName], ...]
+let hiddenUnits = new Set();
 
 function setStatus(kind, text) {
   els.status.className = 'status status-' + kind;
@@ -46,6 +49,8 @@ async function loadSettings() {
   els.chkNeutral.checked    = !!s.showNeutral;
   els.selFontSize.value     = String(s.fontSize ?? 14);
   els.chkIndicators.checked = !!s.showIndicators;
+  hiddenUnits = new Set(s.hiddenUnits || []);
+  updateFilterBadge();
 }
 
 async function saveSettings() {
@@ -54,6 +59,7 @@ async function saveSettings() {
     showNeutral:    els.chkNeutral.checked,
     showIndicators: els.chkIndicators.checked,
     fontSize:       Number(els.selFontSize.value),
+    hiddenUnits:    [...hiddenUnits],
   };
   await chrome.storage.local.set({ [STORAGE_KEY]: s });
   return s;
@@ -93,6 +99,80 @@ async function probeStatus() {
   }
 }
 
+function updateFilterBadge() {
+  const badge = document.getElementById('filter-badge');
+  if (!badge) return;
+  badge.textContent = hiddenUnits.size > 0 ? `${hiddenUnits.size} 已隱藏` : '';
+}
+
+function renderFilterList(searchText = '') {
+  const container = document.getElementById('filter-list');
+  const countLabel = document.getElementById('filter-count-label');
+  if (!container) return;
+  const q = searchText.trim().toLowerCase();
+  const filtered = allUnits.filter(([ruleName, displayName]) =>
+    !q || displayName.toLowerCase().includes(q) || ruleName.toLowerCase().includes(q)
+  );
+  container.innerHTML = '';
+  filtered.forEach(([ruleName, displayName]) => {
+    const label = document.createElement('label');
+    label.className = 'filter-item';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = !hiddenUnits.has(ruleName);
+    cb.dataset.rule = ruleName;
+    cb.addEventListener('change', () => {
+      if (cb.checked) hiddenUnits.delete(ruleName);
+      else hiddenUnits.add(ruleName);
+      updateFilterBadge();
+    });
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'filter-item-name';
+    nameSpan.textContent = displayName;
+    const ruleSpan = document.createElement('span');
+    ruleSpan.className = 'filter-item-rule';
+    ruleSpan.textContent = ruleName;
+    label.append(cb, nameSpan, ruleSpan);
+    container.appendChild(label);
+  });
+  if (countLabel) countLabel.textContent = `${filtered.length} / ${allUnits.length}`;
+}
+
+async function loadAndRenderUnitList() {
+  const note = document.getElementById('filter-note');
+  const search = document.getElementById('filter-search');
+  const toolbar = document.querySelector('.filter-toolbar');
+  if (allUnits.length > 0) {
+    if (note)    note.style.display = 'none';
+    if (search)  search.style.display = '';
+    if (toolbar) toolbar.style.display = '';
+    renderFilterList(search?.value || '');
+    return;
+  }
+  if (note) note.textContent = '載入中…';
+  const tab = await getActiveGameTab();
+  if (!tab) {
+    if (note) note.textContent = '請先連線至遊戲';
+    return;
+  }
+  try {
+    const res = await chrome.tabs.sendMessage(tab.id, { __ra2names: true, cmd: 'getUnitNames' });
+    if (!res || !res.units || res.units.length === 0) {
+      if (note) note.textContent = res?.source === 'none'
+        ? '進入對局後單位清單才會出現'
+        : '無法取得單位清單';
+      return;
+    }
+    allUnits = res.units;
+    if (note)    note.style.display = 'none';
+    if (search)  search.style.display = '';
+    if (toolbar) toolbar.style.display = '';
+    renderFilterList();
+  } catch (e) {
+    if (note) note.textContent = '無法連線，請重新整理遊戲頁';
+  }
+}
+
 async function applySettings() {
   const tab = await getActiveGameTab();
   if (!tab) { setMsg('err', '請先開啟遊戲分頁'); return; }
@@ -120,6 +200,26 @@ async function applySettings() {
 // Wire up events
 els.apply.addEventListener('click', applySettings);
 els.enabled.addEventListener('change', syncLabelRows);
+
+document.getElementById('section-filter')?.addEventListener('toggle', (e) => {
+  if (e.target.open) loadAndRenderUnitList();
+});
+
+document.getElementById('filter-search')?.addEventListener('input', (e) => {
+  renderFilterList(e.target.value);
+});
+
+document.getElementById('filter-all')?.addEventListener('click', () => {
+  hiddenUnits.clear();
+  updateFilterBadge();
+  renderFilterList(document.getElementById('filter-search')?.value || '');
+});
+
+document.getElementById('filter-none')?.addEventListener('click', () => {
+  allUnits.forEach(([ruleName]) => hiddenUnits.add(ruleName));
+  updateFilterBadge();
+  renderFilterList(document.getElementById('filter-search')?.value || '');
+});
 
 // Boot
 (async () => {
