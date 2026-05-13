@@ -219,7 +219,7 @@ function updateCrateBadge() {
   if (n === 0) {
     badge.textContent = '已關閉';
     badge.className = 'filter-badge badge-off';
-  } else if (n === CRATE_TYPES.length) {
+  } else if (CRATE_TYPES.every(({ id }) => enabledCrateTypes.has(id))) {
     badge.textContent = '全部';
     badge.className = 'filter-badge';
   } else {
