@@ -22,6 +22,19 @@ const SNAPSHOTS_KEY = 'ra2NamesSnapshots';
 let filterMode = 'custom';   // 'custom' | 'preset'
 let snapshots  = [];         // [{ name, hiddenUnits, totalCount }, ...]
 
+async function updateActionIcon(tabId, active) {
+  const path = active ? {
+    16: 'icons/running-16.png',
+    32: 'icons/running-32.png',
+    48: 'icons/running-48.png',
+  } : {
+    16: 'icons/stopping-16.png',
+    32: 'icons/stopping-32.png',
+    48: 'icons/stopping-48.png',
+  };
+  try { await chrome.action.setIcon({ tabId, path }); } catch (_) {}
+}
+
 function setStatus(kind, text) {
   els.status.className = 'status status-' + kind;
   els.status.textContent = text;
@@ -155,8 +168,9 @@ async function probeStatus() {
       els.apply.disabled = false;
       return res;
     }
-    if (res.enabled || res.showIndicators) setStatus('ok', '已啟用');
-    else                                    setStatus('ok', '已連線');
+    const active = !!(res.enabled || res.showIndicators);
+    setStatus('ok', active ? '已啟用' : '已連線');
+    await updateActionIcon(tab.id, active);
     els.apply.disabled = false;
     return res;
   } catch (e) {
@@ -260,6 +274,7 @@ async function applySettings() {
     } else {
       setMsg('ok', opts.enabled ? '已啟用' : '已停用');
       setStatus('ok', opts.enabled ? '已啟用' : '已連線');
+      await updateActionIcon(tab.id, !!(opts.enabled || opts.showIndicators));
     }
   } catch (e) {
     setMsg('err', '無法傳送指令,請重新整理遊戲頁');
