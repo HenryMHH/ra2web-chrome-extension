@@ -388,13 +388,15 @@
     const PX = 5, PY = 3;
 
     for (const crate of crates) {
-      try {
-        const obj = crate.obj;
-        if (!obj || !obj.tile) continue;
-        const powerupType = crate.powerup?.type;
-        const label = POWERUP_LABELS[powerupType];
-        if (!label) continue;
+      const obj = crate.obj;
+      if (!obj || !obj.tile) continue;
+      const powerupType = crate.powerup?.type;
+      const label = POWERUP_LABELS[powerupType];
+      if (!label) continue;
 
+      // Projection math in its own try-catch so errors skip to next crate.
+      let sx, sy;
+      try {
         // Get world position: try obj.position.worldPosition first, fall back to tile coords.
         let wx, wy, wz;
         const wp = obj.position?.worldPosition;
@@ -409,13 +411,15 @@
         _tmpV3.set(wx, wy, wz);
         _tmpV3.project(camera);
 
-        const sx = (_tmpV3.x + 1) / 2 * W;
-        const sy = (-_tmpV3.y + 1) / 2 * H;
+        sx = (_tmpV3.x + 1) / 2 * W;
+        sy = (-_tmpV3.y + 1) / 2 * H;
 
         // Only draw if on-screen
         if (sx < -40 || sx > W + 40 || sy < -20 || sy > H + 20) continue;
+      } catch (_) { continue; }
 
-        ctx.save();
+      ctx.save();
+      try {
         ctx.font = `600 ${LABEL_FS}px 'Fira Sans Condensed', Arial, sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'bottom';
@@ -423,7 +427,7 @@
         const lw = tw + PX * 2;
         const lh = LABEL_FS + PY * 2;
         const lx = Math.max(1, Math.min(sx - lw / 2, W - lw - 1));
-        const ly = sy - 18; // offset upward from crate centre
+        const ly = Math.max(0, sy - 18); // offset upward from crate centre; clamp to top edge
         ctx.fillStyle = 'rgba(200,155,0,0.92)';
         ctx.fillRect(lx, ly, lw, lh);
         ctx.strokeStyle = 'rgba(255,230,100,0.7)';
@@ -431,8 +435,9 @@
         ctx.strokeRect(lx, ly, lw, lh);
         ctx.fillStyle = '#fff';
         ctx.fillText(label, lx + lw / 2, ly + lh - PY);
+      } finally {
         ctx.restore();
-      } catch (_) { /* skip bad crate */ }
+      }
     }
   }
 
@@ -458,6 +463,8 @@
     if (state.showIndicators) {
       const MARGIN     = 24;   // px inset from the viewport edge
       const ARROW_HALF = 10;   // half-length of arrow head
+      const LABEL_FS   = 11;
+      const PX = 5, PY = 3;
 
       if (!state.alliances || !state.viewer) return;
       const local = state.viewer.value;
@@ -507,11 +514,9 @@
               const goName = resolveNameFromGo(go);
               if (goName) {
                 ctx.save();
-                const LABEL_FS = 11;
                 ctx.font = `600 ${LABEL_FS}px 'Fira Sans Condensed', Arial, sans-serif`;
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'top';
-                const PX = 5, PY = 3;
                 const tw = ctx.measureText(goName).width;
                 const lw = tw + PX * 2;
                 const lh = LABEL_FS + PY * 2;
