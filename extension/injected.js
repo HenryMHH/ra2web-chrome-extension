@@ -377,9 +377,68 @@
 
   let _tmpV3 = null; // reused across loop iterations; .set() at top of each iteration always overwrites before use
 
-  function drawIndicators() {
-    if (!state.showIndicators) { state.rafId = null; return; }
-    state.rafId = requestAnimationFrame(drawIndicators);
+  function drawCrateLabels(ctx, W, H, camera) {
+    if (!state.crateTraitRef) return;
+    const crates = state.crateTraitRef.crates;
+    if (!crates || crates.length === 0) return;
+    const Coords = state.Coords;
+    if (!Coords) return;
+
+    const LABEL_FS = 11;
+    const PX = 5, PY = 3;
+
+    for (const crate of crates) {
+      try {
+        const obj = crate.obj;
+        if (!obj || !obj.tile) continue;
+        const powerupType = crate.powerup?.type;
+        const label = POWERUP_LABELS[powerupType];
+        if (!label) continue;
+
+        // Get world position: try obj.position.worldPosition first, fall back to tile coords.
+        let wx, wy, wz;
+        const wp = obj.position?.worldPosition;
+        if (wp) {
+          wx = wp.x; wy = wp.y; wz = wp.z;
+        } else {
+          const tile = obj.tile;
+          const v3 = Coords.tile3dToWorld(tile.rx + 0.5, tile.ry + 0.5, tile.z || 0);
+          wx = v3.x; wy = v3.y; wz = v3.z;
+        }
+
+        _tmpV3.set(wx, wy, wz);
+        _tmpV3.project(camera);
+
+        const sx = (_tmpV3.x + 1) / 2 * W;
+        const sy = (-_tmpV3.y + 1) / 2 * H;
+
+        // Only draw if on-screen
+        if (sx < -40 || sx > W + 40 || sy < -20 || sy > H + 20) continue;
+
+        ctx.save();
+        ctx.font = `600 ${LABEL_FS}px 'Fira Sans Condensed', Arial, sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        const tw = ctx.measureText(label).width;
+        const lw = tw + PX * 2;
+        const lh = LABEL_FS + PY * 2;
+        const lx = Math.max(1, Math.min(sx - lw / 2, W - lw - 1));
+        const ly = sy - 18; // offset upward from crate centre
+        ctx.fillStyle = 'rgba(200,155,0,0.92)';
+        ctx.fillRect(lx, ly, lw, lh);
+        ctx.strokeStyle = 'rgba(255,230,100,0.7)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(lx, ly, lw, lh);
+        ctx.fillStyle = '#fff';
+        ctx.fillText(label, lx + lw / 2, ly + lh - PY);
+        ctx.restore();
+      } catch (_) { /* skip bad crate */ }
+    }
+  }
+
+  function drawOverlay() {
+    if (!state.showIndicators && !state.showCrateContents) { state.rafId = null; return; }
+    state.rafId = requestAnimationFrame(drawOverlay);
     if (!state.overlayCanvas || !state.activeCamera) return;
     if (!_tmpV3) _tmpV3 = new THREE.Vector3();
 
@@ -394,92 +453,100 @@
     // Game loop stopped (game ended) → stay cleared, don't draw stale positions.
     if (state.lastPipUpdateTime > 0 && performance.now() - state.lastPipUpdateTime > 2000) return;
 
-    const camera     = state.activeCamera;
-    const MARGIN     = 24;   // px inset from the viewport edge
-    const ARROW_HALF = 10;   // half-length of arrow head
+    const camera = state.activeCamera;
 
-    if (!state.alliances || !state.viewer) return;
-    const local = state.viewer.value;
-    const cx = W / 2, cy = H / 2;
+    if (state.showIndicators) {
+      const MARGIN     = 24;   // px inset from the viewport edge
+      const ARROW_HALF = 10;   // half-length of arrow head
 
-    if (!state.alliances.playerList?.players) return;
-    for (const player of state.alliances.playerList.players) {
-      if (player === local || player.isNeutral || state.alliances.areAllied(player, local)) continue;
-      try {
-        for (const go of player.getOwnedObjects()) {
-          if (go.isDestroyed || !go.position) continue;
-          if (state.hiddenUnits.size > 0 && state.hiddenUnits.has(go.rules?.name?.toUpperCase())) continue;
-          try {
-            const wp = go.position.worldPosition;
-            _tmpV3.set(wp.x, wp.y, wp.z);
-            _tmpV3.project(camera);
+      if (!state.alliances || !state.viewer) return;
+      const local = state.viewer.value;
+      const cx = W / 2, cy = H / 2;
 
-            const sx = (_tmpV3.x + 1) / 2 * W;
-            const sy = (-_tmpV3.y + 1) / 2 * H;
-            if (sx >= MARGIN && sx <= W - MARGIN && sy >= MARGIN && sy <= H - MARGIN) continue;
+      if (!state.alliances.playerList?.players) return;
+      for (const player of state.alliances.playerList.players) {
+        if (player === local || player.isNeutral || state.alliances.areAllied(player, local)) continue;
+        try {
+          for (const go of player.getOwnedObjects()) {
+            if (go.isDestroyed || !go.position) continue;
+            if (state.hiddenUnits.size > 0 && state.hiddenUnits.has(go.rules?.name?.toUpperCase())) continue;
+            try {
+              const wp = go.position.worldPosition;
+              _tmpV3.set(wp.x, wp.y, wp.z);
+              _tmpV3.project(camera);
 
-            const angle = Math.atan2(sy - cy, sx - cx);
-            const cos = Math.cos(angle), sin = Math.sin(angle);
+              const sx = (_tmpV3.x + 1) / 2 * W;
+              const sy = (-_tmpV3.y + 1) / 2 * H;
+              if (sx >= MARGIN && sx <= W - MARGIN && sy >= MARGIN && sy <= H - MARGIN) continue;
 
-            const scaleX = (cos !== 0) ? (W / 2 - MARGIN) / Math.abs(cos) : Infinity;
-            const scaleY = (sin !== 0) ? (H / 2 - MARGIN) / Math.abs(sin) : Infinity;
-            const scale  = Math.min(scaleX, scaleY);
-            const ex = cx + cos * scale;
-            const ey = cy + sin * scale;
+              const angle = Math.atan2(sy - cy, sx - cx);
+              const cos = Math.cos(angle), sin = Math.sin(angle);
 
-            ctx.save();
-            ctx.translate(ex, ey);
-            ctx.rotate(angle);
-            ctx.beginPath();
-            ctx.moveTo(ARROW_HALF, 0);
-            ctx.lineTo(-ARROW_HALF, -ARROW_HALF * 0.6);
-            ctx.lineTo(-ARROW_HALF * 0.4, 0);
-            ctx.lineTo(-ARROW_HALF, ARROW_HALF * 0.6);
-            ctx.closePath();
-            ctx.fillStyle   = 'rgba(210,30,30,0.9)';
-            ctx.strokeStyle = 'rgba(255,255,255,0.8)';
-            ctx.lineWidth   = 1.5;
-            ctx.fill();
-            ctx.stroke();
-            ctx.restore();
+              const scaleX = (cos !== 0) ? (W / 2 - MARGIN) / Math.abs(cos) : Infinity;
+              const scaleY = (sin !== 0) ? (H / 2 - MARGIN) / Math.abs(sin) : Infinity;
+              const scale  = Math.min(scaleX, scaleY);
+              const ex = cx + cos * scale;
+              const ey = cy + sin * scale;
 
-            const goName = resolveNameFromGo(go);
-            if (goName) {
               ctx.save();
-              const LABEL_FS = 11;
-              ctx.font = `600 ${LABEL_FS}px 'Fira Sans Condensed', Arial, sans-serif`;
-              ctx.textAlign = 'center';
-              ctx.textBaseline = 'top';
-              const PX = 5, PY = 3;
-              const tw = ctx.measureText(goName).width;
-              const lw = tw + PX * 2;
-              const lh = LABEL_FS + PY * 2;
-              const lx = Math.max(1, Math.min(ex - lw / 2, W - lw - 1));
-              const lyRaw = ey + ARROW_HALF + 4;
-              const ly = Math.min(lyRaw, H - lh - 1);
-              ctx.fillStyle = 'rgba(210,30,30,0.9)';
-              ctx.fillRect(lx, ly, lw, lh);
-              ctx.strokeStyle = 'rgba(255,255,255,0.6)';
-              ctx.lineWidth = 1;
-              ctx.strokeRect(lx, ly, lw, lh);
-              ctx.fillStyle = 'white';
-              ctx.fillText(goName, lx + lw / 2, ly + PY);
+              ctx.translate(ex, ey);
+              ctx.rotate(angle);
+              ctx.beginPath();
+              ctx.moveTo(ARROW_HALF, 0);
+              ctx.lineTo(-ARROW_HALF, -ARROW_HALF * 0.6);
+              ctx.lineTo(-ARROW_HALF * 0.4, 0);
+              ctx.lineTo(-ARROW_HALF, ARROW_HALF * 0.6);
+              ctx.closePath();
+              ctx.fillStyle   = 'rgba(210,30,30,0.9)';
+              ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+              ctx.lineWidth   = 1.5;
+              ctx.fill();
+              ctx.stroke();
               ctx.restore();
-            }
-          } catch (_) { /* skip bad go */ }
-        }
-      } catch (_) { /* skip bad player */ }
+
+              const goName = resolveNameFromGo(go);
+              if (goName) {
+                ctx.save();
+                const LABEL_FS = 11;
+                ctx.font = `600 ${LABEL_FS}px 'Fira Sans Condensed', Arial, sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'top';
+                const PX = 5, PY = 3;
+                const tw = ctx.measureText(goName).width;
+                const lw = tw + PX * 2;
+                const lh = LABEL_FS + PY * 2;
+                const lx = Math.max(1, Math.min(ex - lw / 2, W - lw - 1));
+                const lyRaw = ey + ARROW_HALF + 4;
+                const ly = Math.min(lyRaw, H - lh - 1);
+                ctx.fillStyle = 'rgba(210,30,30,0.9)';
+                ctx.fillRect(lx, ly, lw, lh);
+                ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(lx, ly, lw, lh);
+                ctx.fillStyle = 'white';
+                ctx.fillText(goName, lx + lw / 2, ly + PY);
+                ctx.restore();
+              }
+            } catch (_) { /* skip bad go */ }
+          }
+        } catch (_) { /* skip bad player */ }
+      }
+    }
+
+    if (state.showCrateContents) {
+      drawCrateLabels(ctx, W, H, camera);
     }
   }
 
   // ---------------------------------------------------------------------------
   // Public commands, called from the content script via postMessage
   // ---------------------------------------------------------------------------
-  async function apply({ enabled, showNeutral, showIndicators, fontSize, hiddenUnits = [] }) {
-    state.enabled        = !!enabled;
-    state.showNeutral    = !!showNeutral;
-    state.showIndicators = !!showIndicators;
-    state.hiddenUnits    = new Set(Array.isArray(hiddenUnits) ? hiddenUnits.map(s => String(s).toUpperCase()) : []);
+  async function apply({ enabled, showNeutral, showIndicators, showCrateContents, fontSize, hiddenUnits = [] }) {
+    state.enabled           = !!enabled;
+    state.showNeutral       = !!showNeutral;
+    state.showIndicators    = !!showIndicators;
+    state.showCrateContents = !!showCrateContents;
+    state.hiddenUnits       = new Set(Array.isArray(hiddenUnits) ? hiddenUnits.map(s => String(s).toUpperCase()) : []);
     if (typeof fontSize === 'number' && fontSize >= 10 && fontSize <= 20) {
       state.fontSize = fontSize;
     } else {
@@ -487,7 +554,7 @@
       state.fontSize = 14;
     }
 
-    const needPatch = state.enabled || state.showIndicators;
+    const needPatch = state.enabled || state.showIndicators || state.showCrateContents;
     if (needPatch) {
       const ok = await loadClasses();
       if (!ok) return { ok: false, error: 'modules not available' };
@@ -501,17 +568,18 @@
       log('apply: labels disabled, swept');
     }
 
-    if (state.showIndicators) {
+    const needOverlay = state.showIndicators || state.showCrateContents;
+    if (needOverlay) {
       initOverlay();
       if (state.rafId) { cancelAnimationFrame(state.rafId); state.rafId = null; }
-      drawIndicators();
-      log('apply: indicators enabled');
+      drawOverlay();
+      log('apply: overlay enabled (indicators=' + state.showIndicators + ', crates=' + state.showCrateContents + ')');
     } else {
       removeOverlay();
-      log('apply: indicators disabled');
+      log('apply: overlay disabled');
     }
 
-    return { ok: true, state: { enabled: state.enabled, showNeutral: state.showNeutral, showIndicators: state.showIndicators, fontSize: state.fontSize } };
+    return { ok: true, state: { enabled: state.enabled, showNeutral: state.showNeutral, showIndicators: state.showIndicators, showCrateContents: state.showCrateContents, fontSize: state.fontSize } };
   }
 
   function getUnitNames() {
@@ -538,6 +606,7 @@
       enabled: state.enabled,
       showNeutral: state.showNeutral,
       showIndicators: state.showIndicators,
+      showCrateContents: state.showCrateContents,
       fontSize: state.fontSize,
       systemAvailable: typeof System !== 'undefined' && !!System.import,
       threeAvailable: typeof THREE !== 'undefined' && !!THREE.WebGLRenderer,
