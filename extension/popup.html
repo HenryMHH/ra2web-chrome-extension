@@ -51,6 +51,30 @@
       </div>
     </label>
 
+    <details id="section-filter" class="filter-section">
+      <summary class="filter-summary">
+        <span class="filter-summary-title">單位篩選</span>
+        <span id="filter-badge" class="filter-badge"></span>
+      </summary>
+      <div class="filter-body">
+        <div id="filter-note" class="filter-note">請先連線至遊戲</div>
+        <input
+          type="text"
+          id="filter-search"
+          class="filter-search"
+          placeholder="搜尋單位名稱…"
+          autocomplete="off"
+          style="display:none"
+        >
+        <div class="filter-toolbar" style="display:none">
+          <button id="filter-all"  class="small">全選</button>
+          <button id="filter-none" class="small">全不選</button>
+          <span id="filter-count-label" class="filter-count-label"></span>
+        </div>
+        <div id="filter-list" class="filter-list"></div>
+      </div>
+    </details>
+
     <div class="actions">
       <button id="apply" class="primary">套用</button>
     </div>
