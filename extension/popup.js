@@ -35,11 +35,19 @@ const STORAGE_KEY = 'ra2NamesSettings';
 const DEFAULTS = { enabled: false, showNeutral: false, showIndicators: false, enabledCrateTypes: [], fontSize: 14, hiddenUnits: [], filterMode: 'custom' };
 
 let allUnits  = [];   // [[ruleName, displayName], ...]
-let hiddenUnits = new Set();
+let hiddenUnitsCustom = new Set();
+let selectedPresetIndex = -1;
 let enabledCrateTypes = new Set();
 const SNAPSHOTS_KEY = 'ra2NamesSnapshots';
 let filterMode = 'custom';   // 'custom' | 'preset'
 let snapshots  = [];         // [{ name, hiddenUnits, totalCount }, ...]
+
+function getEffectiveHiddenUnits() {
+  if (filterMode === 'preset' && selectedPresetIndex >= 0 && snapshots[selectedPresetIndex]) {
+    return snapshots[selectedPresetIndex].hiddenUnits;
+  }
+  return [...hiddenUnitsCustom];
+}
 
 async function updateActionIcon(tabId, active) {
   const path = active ? {
@@ -94,21 +102,26 @@ async function loadSettings() {
   } else {
     enabledCrateTypes = new Set();
   }
-  hiddenUnits = new Set(s.hiddenUnits || []);
+  // Load custom hidden units (migrate from old key 'hiddenUnits')
+  hiddenUnitsCustom = new Set(s.hiddenUnitsCustom || s.hiddenUnits || []);
+  selectedPresetIndex = typeof s.selectedPresetIndex === 'number' ? s.selectedPresetIndex : -1;
   filterMode  = s.filterMode || 'custom';
   renderCrateGrid();
   updateFilterBadge();
+  updateActiveFilterInfo();
 }
 
 async function saveSettings() {
   const s = {
-    enabled:          els.enabled.checked,
-    showNeutral:      els.chkNeutral.checked,
-    showIndicators:   els.chkIndicators.checked,
-    enabledCrateTypes: [...enabledCrateTypes],
-    fontSize:         Number(els.selFontSize.value),
-    hiddenUnits:      [...hiddenUnits],
+    enabled:            els.enabled.checked,
+    showNeutral:        els.chkNeutral.checked,
+    showIndicators:     els.chkIndicators.checked,
+    enabledCrateTypes:  [...enabledCrateTypes],
+    fontSize:           Number(els.selFontSize.value),
+    hiddenUnitsCustom:  [...hiddenUnitsCustom],
+    selectedPresetIndex,
     filterMode,
+    hiddenUnits:        getEffectiveHiddenUnits(),
   };
   await chrome.storage.local.set({ [STORAGE_KEY]: s });
   return s;
@@ -127,7 +140,7 @@ async function saveSnapshot(name) {
   const ts = new Date().toISOString();
   snapshots.push({
     name: `${name} ${ts}`,
-    hiddenUnits: [...hiddenUnits],
+    hiddenUnits: [...hiddenUnitsCustom],
     totalCount: allUnits.length,
   });
   await saveSnapshots();
@@ -251,7 +264,7 @@ function renderCrateGrid() {
 function updateFilterBadge() {
   const badge = document.getElementById('filter-badge');
   if (!badge) return;
-  badge.textContent = hiddenUnits.size > 0 ? `${hiddenUnits.size} 已隱藏` : '';
+  badge.textContent = hiddenUnitsCustom.size > 0 ? `${hiddenUnitsCustom.size} 已隱藏` : '';
 }
 
 function renderFilterList(searchText = '') {
@@ -268,11 +281,11 @@ function renderFilterList(searchText = '') {
     label.className = 'filter-item';
     const cb = document.createElement('input');
     cb.type = 'checkbox';
-    cb.checked = !hiddenUnits.has(ruleName);
+    cb.checked = !hiddenUnitsCustom.has(ruleName);
     cb.dataset.rule = ruleName;
     cb.addEventListener('change', () => {
-      if (cb.checked) hiddenUnits.delete(ruleName);
-      else hiddenUnits.add(ruleName);
+      if (cb.checked) hiddenUnitsCustom.delete(ruleName);
+      else hiddenUnitsCustom.add(ruleName);
       updateFilterBadge();
     });
     const nameSpan = document.createElement('span');
@@ -326,6 +339,26 @@ async function loadAndRenderUnitList() {
   }
 }
 
+function updateActiveFilterInfo() {
+  const el = document.getElementById('active-filter-info');
+  if (!el) return;
+  if (filterMode === 'preset' && selectedPresetIndex >= 0 && snapshots[selectedPresetIndex]) {
+    const snap = snapshots[selectedPresetIndex];
+    const shown = Math.max(0, snap.totalCount - snap.hiddenUnits.length);
+    el.textContent = `套用中：客製選項 — ${snap.name} (${shown}/${snap.totalCount})`;
+    el.className = 'active-filter-info preset';
+  } else if (filterMode === 'custom') {
+    const hidden = hiddenUnitsCustom.size;
+    el.textContent = hidden > 0
+      ? `套用中：單場自訂 — ${hidden} 已隱藏`
+      : `套用中：單場自訂 — 全部顯示`;
+    el.className = hidden > 0 ? 'active-filter-info custom has-hidden' : 'active-filter-info custom';
+  } else {
+    el.textContent = '';
+    el.className = 'active-filter-info';
+  }
+}
+
 async function applySettings() {
   const tab = await getActiveGameTab();
   if (!tab) { setMsg('err', '請先開啟遊戲分頁'); return; }
@@ -343,6 +376,7 @@ async function applySettings() {
       setMsg('ok', opts.enabled ? '已啟用' : '已停用');
       setStatus('ok', opts.enabled ? '已啟用' : '已連線');
       await updateActionIcon(tab.id, !!(opts.enabled || opts.showIndicators || opts.enabledCrateTypes.length > 0));
+      updateActiveFilterInfo();
     }
   } catch (e) {
     setMsg('err', '無法傳送指令,請重新整理遊戲頁');
@@ -367,7 +401,7 @@ document.getElementById('filter-search')?.addEventListener('input', (e) => {
 });
 
 document.getElementById('filter-all')?.addEventListener('click', () => {
-  hiddenUnits.clear();
+  hiddenUnitsCustom.clear();
   updateFilterBadge();
   renderFilterList(document.getElementById('filter-search')?.value || '');
 });
@@ -378,7 +412,7 @@ document.getElementById('filter-none')?.addEventListener('click', () => {
     ? allUnits.filter(([ruleName, displayName]) =>
         displayName.toLowerCase().includes(q) || ruleName.toLowerCase().includes(q))
     : allUnits;
-  toHide.forEach(([ruleName]) => hiddenUnits.add(ruleName));
+  toHide.forEach(([ruleName]) => hiddenUnitsCustom.add(ruleName));
   updateFilterBadge();
   renderFilterList(document.getElementById('filter-search')?.value || '');
 });
@@ -406,10 +440,8 @@ document.getElementById('filter-preset-select')?.addEventListener('change', asyn
   const raw = e.target.value;
   if (raw === '') return;
   const index = Number(raw);
-  const snap = snapshots[index];
-  if (!snap) return;
-  hiddenUnits = new Set(snap.hiddenUnits);
-  updateFilterBadge();
+  if (!snapshots[index]) return;
+  selectedPresetIndex = index;
   await applySettings();
 });
 
