@@ -392,3 +392,18 @@ button.small.danger {
 }
 
 button.small.danger:hover { background: rgba(224,98,94,0.12); }
+
+/* ── Version Badge ───────────────────────────────────────── */
+
+.header-top {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.version-badge {
+  font-size: 9px;
+  color: var(--text-dim);
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
