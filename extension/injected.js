@@ -22,6 +22,7 @@
     enabled: false,
     showNeutral: false,
     showIndicators: false,
+    showCrateContents: false,
     fontSize: 14,
     patched: false,
     origCreate: null,
@@ -34,10 +35,29 @@
     overlayCanvas: null,
     overlayCtx: null,
     rafId: null,
+    crateTraitRef: null,
     sweepPromise: null,
     lastPipUpdateTime: 0,
     discoveredUnits: new Map(),
     hiddenUnits: new Set(),
+  };
+
+  const POWERUP_LABELS = {
+    0:  '裝甲 ↑',
+    1:  '火力 ↑',
+    2:  '基地回復',
+    3:  '金錢',
+    4:  '揭示地圖',
+    5:  '速度 ↑',
+    6:  '老兵升級',
+    7:  '免費單位',
+    8:  '無敵護盾',
+    11: '礦石',
+    13: '隱形',
+    14: '黑暗霧',
+    15: '爆炸',
+    16: '核彈',
+    17: '燃燒',
   };
 
   async function loadClasses() {
