@@ -22,7 +22,7 @@
     enabled: false,
     showNeutral: false,
     showIndicators: false,
-    showCrateContents: false,
+    enabledCrateTypes: new Set(),
     fontSize: 14,
     patched: false,
     origCreate: null,
@@ -399,7 +399,7 @@
       if (!obj || !obj.tile) continue;
       const powerupType = crate.powerup?.type;
       const label = POWERUP_LABELS[powerupType];
-      if (!label) continue;
+      if (!label || !state.enabledCrateTypes.has(powerupType)) continue;
 
       // Projection math in its own try-catch so errors skip to next crate.
       let sx, sy;
@@ -449,7 +449,7 @@
   }
 
   function drawOverlay() {
-    if (!state.showIndicators && !state.showCrateContents) { state.rafId = null; return; }
+    if (!state.showIndicators && state.enabledCrateTypes.size === 0) { state.rafId = null; return; }
     state.rafId = requestAnimationFrame(drawOverlay);
     if (!state.overlayCanvas || !state.activeCamera) return;
     if (!_tmpV3) _tmpV3 = new THREE.Vector3();
@@ -545,7 +545,7 @@
       }
     }
 
-    if (state.showCrateContents) {
+    if (state.enabledCrateTypes.size > 0) {
       drawCrateLabels(ctx, W, H, camera);
     }
   }
@@ -553,11 +553,11 @@
   // ---------------------------------------------------------------------------
   // Public commands, called from the content script via postMessage
   // ---------------------------------------------------------------------------
-  async function apply({ enabled, showNeutral, showIndicators, showCrateContents, fontSize, hiddenUnits = [] }) {
+  async function apply({ enabled, showNeutral, showIndicators, enabledCrateTypes, fontSize, hiddenUnits = [] }) {
     state.enabled           = !!enabled;
     state.showNeutral       = !!showNeutral;
     state.showIndicators    = !!showIndicators;
-    state.showCrateContents = !!showCrateContents;
+    state.enabledCrateTypes = new Set(Array.isArray(enabledCrateTypes) ? enabledCrateTypes.map(Number) : []);
     state.hiddenUnits       = new Set(Array.isArray(hiddenUnits) ? hiddenUnits.map(s => String(s).toUpperCase()) : []);
     if (typeof fontSize === 'number' && fontSize >= 10 && fontSize <= 20) {
       state.fontSize = fontSize;
@@ -566,7 +566,7 @@
       state.fontSize = 14;
     }
 
-    const needPatch = state.enabled || state.showIndicators || state.showCrateContents;
+    const needPatch = state.enabled || state.showIndicators || state.enabledCrateTypes.size > 0;
     if (needPatch) {
       const ok = await loadClasses();
       if (!ok) return { ok: false, error: 'modules not available' };
@@ -580,18 +580,18 @@
       log('apply: labels disabled, swept');
     }
 
-    const needOverlay = state.showIndicators || state.showCrateContents;
+    const needOverlay = state.showIndicators || state.enabledCrateTypes.size > 0;
     if (needOverlay) {
       initOverlay();
       if (state.rafId) { cancelAnimationFrame(state.rafId); state.rafId = null; }
       drawOverlay();
-      log('apply: overlay enabled (indicators=' + state.showIndicators + ', crates=' + state.showCrateContents + ')');
+      log('apply: overlay enabled (indicators=' + state.showIndicators + ', crateTypes=' + state.enabledCrateTypes.size + ')');
     } else {
       removeOverlay();
       log('apply: overlay disabled');
     }
 
-    return { ok: true, state: { enabled: state.enabled, showNeutral: state.showNeutral, showIndicators: state.showIndicators, showCrateContents: state.showCrateContents, fontSize: state.fontSize } };
+    return { ok: true, state: { enabled: state.enabled, showNeutral: state.showNeutral, showIndicators: state.showIndicators, enabledCrateTypes: [...state.enabledCrateTypes], fontSize: state.fontSize } };
   }
 
   function getUnitNames() {
@@ -618,7 +618,7 @@
       enabled: state.enabled,
       showNeutral: state.showNeutral,
       showIndicators: state.showIndicators,
-      showCrateContents: state.showCrateContents,
+      enabledCrateTypes: [...state.enabledCrateTypes],
       fontSize: state.fontSize,
       systemAvailable: typeof System !== 'undefined' && !!System.import,
       threeAvailable: typeof THREE !== 'undefined' && !!THREE.WebGLRenderer,
