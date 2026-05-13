@@ -110,7 +110,7 @@ function renderSnapshotSelect() {
   snapshots.forEach((snap, i) => {
     const opt = document.createElement('option');
     opt.value = String(i);
-    const shown = snap.totalCount - snap.hiddenUnits.length;
+    const shown = Math.max(0, snap.totalCount - snap.hiddenUnits.length);
     opt.textContent = `${snap.name} (${shown}/${snap.totalCount})`;
     sel.appendChild(opt);
   });
@@ -128,10 +128,8 @@ function switchMode(mode) {
   if (modeCustomBtn) modeCustomBtn.classList.toggle('active', isCustom);
   if (modePresetBtn) modePresetBtn.classList.toggle('active', !isCustom);
   if (!isCustom) renderSnapshotSelect();
-  if (isCustom && allUnits.length > 0) {
-    const saveRow = document.getElementById('filter-save-row');
-    if (saveRow) saveRow.style.display = '';
-  }
+  const saveRow = document.getElementById('filter-save-row');
+  if (saveRow) saveRow.style.display = (isCustom && allUnits.length > 0) ? '' : 'none';
 }
 
 async function getActiveGameTab() {
@@ -315,13 +313,16 @@ document.getElementById('filter-save-btn')?.addEventListener('click', async () =
   const nameInput = document.getElementById('filter-save-name');
   const name = (nameInput?.value || '').trim();
   if (!name) { setMsg('warn', '請輸入快照名稱'); return; }
+  if (allUnits.length === 0) { setMsg('warn', '請先載入單位清單'); return; }
   await saveSnapshot(name);
   if (nameInput) nameInput.value = '';
   setMsg('ok', `快照「${name}」已儲存`);
 });
 
 document.getElementById('filter-preset-select')?.addEventListener('change', async (e) => {
-  const index = Number(e.target.value);
+  const raw = e.target.value;
+  if (raw === '') return;
+  const index = Number(raw);
   const snap = snapshots[index];
   if (!snap) return;
   hiddenUnits = new Set(snap.hiddenUnits);
@@ -332,8 +333,10 @@ document.getElementById('filter-preset-select')?.addEventListener('change', asyn
 document.getElementById('filter-preset-delete')?.addEventListener('click', async () => {
   const sel = document.getElementById('filter-preset-select');
   if (!sel || snapshots.length === 0) return;
-  const index = Number(sel.value);
-  if (isNaN(index) || index < 0 || index >= snapshots.length) return;
+  const raw = sel.value;
+  if (raw === '' || isNaN(Number(raw))) return;
+  const index = Number(raw);
+  if (index < 0 || index >= snapshots.length) return;
   await deleteSnapshot(index);
   renderSnapshotSelect();
 });
