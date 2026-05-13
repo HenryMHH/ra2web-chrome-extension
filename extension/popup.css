@@ -458,3 +458,17 @@ button.small.danger:hover { background: rgba(224,98,94,0.12); }
   color: var(--text-dim);
   font-weight: 400;
 }
+
+/* ── Active Filter Status ────────────────────────────────── */
+
+.active-filter-info {
+  font-size: 10px;
+  color: var(--text-dim);
+  padding: 2px 10px 4px;
+  min-height: 14px;
+  line-height: 1.4;
+}
+
+.active-filter-info.preset { color: var(--accent); }
+.active-filter-info.custom { color: var(--text-dim); }
+.active-filter-info.custom.has-hidden { color: var(--accent); }
