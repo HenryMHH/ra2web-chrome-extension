@@ -64,16 +64,24 @@
     if (state.PipOverlay && state.CanvasUtils) return true;
     if (typeof System === 'undefined' || !System.import) return false;
     try {
-      const [P, CU, SU, CO] = await Promise.all([
+      const [P, CU, SU, CO, CGT] = await Promise.all([
         System.import('engine/renderable/entity/PipOverlay'),
         System.import('engine/gfx/CanvasUtils'),
         System.import('engine/gfx/SpriteUtils'),
         System.import('game/Coords'),
+        System.import('game/trait/CrateGeneratorTrait'),
       ]);
       state.PipOverlay  = P.PipOverlay;
       state.CanvasUtils = CU.CanvasUtils;
       state.SpriteUtils = SU.SpriteUtils;
       state.Coords      = CO.Coords;
+      // Patch CrateGeneratorTrait.prototype.init to capture the live trait instance.
+      // init(game) is called once per game session; re-called on session restart.
+      const origCGTInit = CGT.CrateGeneratorTrait.prototype.init;
+      CGT.CrateGeneratorTrait.prototype.init = function (game) {
+        state.crateTraitRef = this;
+        return origCGTInit.apply(this, arguments);
+      };
       return !!(state.PipOverlay && state.CanvasUtils && state.SpriteUtils && state.Coords);
     } catch (e) {
       warn('System.import failed:', e); return false;
