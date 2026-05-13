@@ -54,13 +54,19 @@
       </div>
     </label>
 
-    <label class="row" id="row-crates">
-      <input type="checkbox" id="chk-crates">
-      <div class="row-text">
-        <div class="row-title">顯示寶箱內容</div>
-        <div class="row-sub">在每個寶箱上方顯示獎勵類型</div>
+    <details id="section-crates" class="filter-section">
+      <summary class="filter-summary">
+        <span class="filter-summary-title">顯示寶箱內容</span>
+        <span id="crate-badge" class="filter-badge badge-off">已關閉</span>
+      </summary>
+      <div class="crate-body">
+        <div class="crate-toolbar">
+          <button id="crate-all" class="small">全選</button>
+          <button id="crate-none" class="small">全不選</button>
+        </div>
+        <div id="crate-type-grid" class="crate-type-grid"></div>
       </div>
-    </label>
+    </details>
 
     <details id="section-filter" class="filter-section">
       <summary class="filter-summary">
