@@ -50,12 +50,12 @@
       try {
         const obj = await chrome.storage.local.get(STORAGE_KEY);
         const s = obj[STORAGE_KEY];
-        if (!s || (!s.enabled && !s.showIndicators)) return;
+        if (!s || (!s.enabled && !s.showIndicators && !s.showCrateContents)) return;
         const res = await pageCmd('apply', s);
         if (res.ok) {
           chrome.runtime.sendMessage({
             cmd: 'setIcon',
-            active: !!(s.enabled || s.showIndicators),
+            active: !!(s.enabled || s.showIndicators || s.showCrateContents),
           }).catch(() => {});
         }
       } catch (_) {}
