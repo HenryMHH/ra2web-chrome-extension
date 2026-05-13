@@ -34,6 +34,7 @@
     overlayCanvas: null,
     overlayCtx: null,
     rafId: null,
+    sweepPromise: null,
   };
 
   async function loadClasses() {
@@ -86,6 +87,7 @@
       const rules = go.rules;
       if (!rules) return null;
       const key = rules.uiName;
+      // state.strings is captured once; stale after session reload (compounds issue #3).
       if (key && state.strings && typeof state.strings.get === 'function') {
         const v = state.strings.get(key);
         if (v && v !== key) return v;
@@ -127,7 +129,8 @@
       y += metrics.height;
     }
 
-    // Shift content 1px (same post-processing as DebugLabel)
+    // Expanding canvas.width/height auto-clears its pixels; putImageData at (1,1) then
+    // restores the original pixels shifted 1px right+down (mirrors DebugLabel post-processing).
     const w = canvas.width, h = canvas.height;
     const imgData = ctx.getImageData(0, 0, w, h);
     canvas.width += 1;
@@ -202,20 +205,29 @@
       self.__unameLbl.dispose();
       self.__unameLbl = null;
     }
-    self.__unameLblText     = newName;
-    self.__unameLblOwner    = newOwner;
-    self.__unameLblTeam     = newTeam;
-    self.__unameLblFontSize = newFontSize;
     if (newName) {
       const lbl = buildLabel(self);
-      if (lbl) { self.__unameLbl = lbl; self.rootObj.add(lbl.get3DObject()); }
+      if (lbl) {
+        self.__unameLbl         = lbl;
+        self.rootObj.add(lbl.get3DObject());
+        self.__unameLblText     = newName;
+        self.__unameLblOwner    = newOwner;
+        self.__unameLblTeam     = newTeam;
+        self.__unameLblFontSize = newFontSize;
+      }
+      // buildLabel null = transient failure; cache stays dirty so next frame retries.
+    } else {
+      self.__unameLblText     = newName;
+      self.__unameLblOwner    = newOwner;
+      self.__unameLblTeam     = newTeam;
+      self.__unameLblFontSize = newFontSize;
     }
   }
 
   function detachLabel(self) {
     if (!self.__unameLbl) return;
     if (self.rootObj) self.rootObj.remove(self.__unameLbl.get3DObject());
-    self.__unameLbl.dispose();
+    self.__unameLbl.dispose(); // may race current-frame render queue; unavoidable without deeper game integration
     self.__unameLbl         = null;
     self.__unameLblText     = undefined;
     self.__unameLblOwner    = undefined;
@@ -234,10 +246,10 @@
       const ret = state.origCreate ? state.origCreate.apply(this, arguments) : undefined;
       try {
         this.__unameLblTracked = true;
-        if (!state.activeCamera && this.camera) state.activeCamera = this.camera;
-        if (!state.alliances && this.alliances) state.alliances = this.alliances;
-        if (!state.viewer && this.viewer) state.viewer = this.viewer;
-        if (!state.strings && this.strings) state.strings = this.strings;
+        if (this.camera)    state.activeCamera = this.camera;
+        if (this.alliances) state.alliances    = this.alliances;
+        if (this.viewer)    state.viewer       = this.viewer;
+        if (this.strings)   state.strings      = this.strings;
         if (shouldShowLabel(this)) attachLabel(this);
       } catch (e) { warn('create patch:', e); }
       return ret;
@@ -246,13 +258,11 @@
     P.prototype.update = function () {
       const ret = state.origUpdate ? state.origUpdate.apply(this, arguments) : undefined;
       try {
-        if (!this.__unameLblTracked) {
-          this.__unameLblTracked = true;
-          if (!state.activeCamera && this.camera) state.activeCamera = this.camera;
-          if (!state.alliances && this.alliances) state.alliances = this.alliances;
-          if (!state.viewer && this.viewer) state.viewer = this.viewer;
-          if (!state.strings && this.strings) state.strings = this.strings;
-        }
+        if (!this.__unameLblTracked) this.__unameLblTracked = true;
+        if (this.camera)    state.activeCamera = this.camera;
+        if (this.alliances) state.alliances    = this.alliances;
+        if (this.viewer)    state.viewer       = this.viewer;
+        if (this.strings)   state.strings      = this.strings;
         if (!shouldShowLabel(this)) {
           if (this.__unameLbl) detachLabel(this);
           return ret;
@@ -278,7 +288,8 @@
   // the next WebGLRenderer.prototype.render call.
   function sweepLeftoverLabels() {
     if (typeof THREE === 'undefined' || !THREE.WebGLRenderer) return Promise.resolve(0);
-    return new Promise(resolve => {
+    if (state.sweepPromise) return state.sweepPromise;
+    state.sweepPromise = new Promise(resolve => {
       const origRender = THREE.WebGLRenderer.prototype.render;
       let done = false;
       THREE.WebGLRenderer.prototype.render = function (scene, camera) {
@@ -302,7 +313,8 @@
         return origRender.apply(this, arguments);
       };
       setTimeout(() => { if (!done) { THREE.WebGLRenderer.prototype.render = origRender; resolve(0); } }, 2000);
-    });
+    }).finally(() => { state.sweepPromise = null; });
+    return state.sweepPromise;
   }
 
   function initOverlay() {
@@ -323,7 +335,7 @@
     }
   }
 
-  let _tmpV3 = null;
+  let _tmpV3 = null; // reused across loop iterations; .set() at top of each iteration always overwrites before use
 
   function drawIndicators() {
     if (!state.showIndicators) { state.rafId = null; return; }
@@ -347,6 +359,7 @@
     const local = state.viewer.value;
     const cx = W / 2, cy = H / 2;
 
+    if (!state.alliances.playerList?.players) return;
     for (const player of state.alliances.playerList.players) {
       if (player === local || player.isNeutral || state.alliances.areAllied(player, local)) continue;
       try {
@@ -422,9 +435,12 @@
     state.enabled        = !!enabled;
     state.showNeutral    = !!showNeutral;
     state.showIndicators = !!showIndicators;
-    state.fontSize       = (typeof fontSize === 'number' && fontSize >= 10 && fontSize <= 20)
-                             ? fontSize
-                             : (warn('apply: invalid fontSize', fontSize, '— using 14'), 14);
+    if (typeof fontSize === 'number' && fontSize >= 10 && fontSize <= 20) {
+      state.fontSize = fontSize;
+    } else {
+      warn('apply: invalid fontSize', fontSize, '— using 14');
+      state.fontSize = 14;
+    }
 
     const needPatch = state.enabled || state.showIndicators;
     if (needPatch) {
@@ -467,7 +483,8 @@
     };
   }
 
-  // Listen for commands from the content script
+  // Permanent listener for the extension's page lifetime; safe because the
+  // ev.source !== window guard filters all non-same-page messages.
   window.addEventListener('message', async (ev) => {
     if (ev.source !== window) return;
     const msg = ev.data;
