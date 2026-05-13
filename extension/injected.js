@@ -230,6 +230,7 @@
     self.__unameLblTeam     = lbl._team;
     self.__unameLblFontSize = state.fontSize;
     self.rootObj.add(lbl.get3DObject());
+    self.rootObj.matrixWorldNeedsUpdate = true;
   }
 
   function refreshLabel(self) {
@@ -252,6 +253,7 @@
       if (lbl) {
         self.__unameLbl         = lbl;
         self.rootObj.add(lbl.get3DObject());
+        self.rootObj.matrixWorldNeedsUpdate = true;
         self.__unameLblText     = newName;
         self.__unameLblOwner    = newOwner;
         self.__unameLblTeam     = newTeam;
@@ -311,7 +313,10 @@
       } catch (_) {}
       try {
         state.lastPipUpdateTime = performance.now();
-        if (!this.__unameLblTracked) this.__unameLblTracked = true;
+        if (!this.__unameLblTracked) {
+          this.__unameLblTracked = true;
+          state.pipInstances.add(this);
+        }
         if (this.camera)    state.activeCamera = this.camera;
         if (this.alliances) state.alliances    = this.alliances;
         if (this.viewer)    state.viewer       = this.viewer;
@@ -581,12 +586,11 @@
     }
 
     if (state.enabled) {
-      // Bootstrap: attach labels to all already-known instances immediately,
-      // because idle units may never have their update() called by the game.
+      let attached = 0;
       for (const pip of state.pipInstances) {
-        try { if (!pip.__unameLbl && shouldShowLabel(pip)) attachLabel(pip); } catch (_) {}
+        try { if (!pip.__unameLbl && shouldShowLabel(pip)) { attachLabel(pip); attached++; } } catch (_) {}
       }
-      log('apply: labels enabled, swept ' + state.pipInstances.size + ' instances');
+      log('apply: labels enabled, attached ' + attached + '/' + state.pipInstances.size + ' instances');
     } else {
       await sweepLeftoverLabels();
       log('apply: labels disabled, swept');
