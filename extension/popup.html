@@ -57,21 +57,51 @@
         <span id="filter-badge" class="filter-badge"></span>
       </summary>
       <div class="filter-body">
-        <div id="filter-note" class="filter-note">請先連線至遊戲</div>
-        <input
-          type="text"
-          id="filter-search"
-          class="filter-search"
-          placeholder="搜尋單位名稱…"
-          autocomplete="off"
-          style="display:none"
-        >
-        <div class="filter-toolbar" style="display:none">
-          <button id="filter-all"  class="small">全選</button>
-          <button id="filter-none" class="small">全不選</button>
-          <span id="filter-count-label" class="filter-count-label"></span>
+
+        <!-- Mode toggle -->
+        <div class="filter-mode-toggle">
+          <button id="mode-custom" class="mode-btn active">單場自訂</button>
+          <button id="mode-preset" class="mode-btn">客製選項</button>
         </div>
-        <div id="filter-list" class="filter-list"></div>
+
+        <!-- Mode 1: per-game checkbox list -->
+        <div id="filter-mode-custom">
+          <div id="filter-note" class="filter-note">請先連線至遊戲</div>
+          <input
+            type="text"
+            id="filter-search"
+            class="filter-search"
+            placeholder="搜尋單位名稱…"
+            autocomplete="off"
+            style="display:none"
+          >
+          <div class="filter-toolbar" style="display:none">
+            <button id="filter-all"  class="small">全選</button>
+            <button id="filter-none" class="small">全不選</button>
+            <span id="filter-count-label" class="filter-count-label"></span>
+          </div>
+          <div id="filter-list" class="filter-list"></div>
+          <div id="filter-save-row" class="filter-save-row" style="display:none">
+            <input
+              type="text"
+              id="filter-save-name"
+              class="filter-save-name"
+              placeholder="快照名稱…"
+              autocomplete="off"
+            >
+            <button id="filter-save-btn" class="small">儲存快照</button>
+          </div>
+        </div>
+
+        <!-- Mode 2: saved snapshot picker -->
+        <div id="filter-mode-preset" style="display:none">
+          <div id="filter-preset-note" class="filter-note">尚無已儲存的快照</div>
+          <div id="filter-preset-row" class="filter-preset-row" style="display:none">
+            <select id="filter-preset-select" class="filter-preset-select"></select>
+            <button id="filter-preset-delete" class="small danger">刪除</button>
+          </div>
+        </div>
+
       </div>
     </details>
 
