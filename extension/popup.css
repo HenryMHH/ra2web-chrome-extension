@@ -407,3 +407,54 @@ button.small.danger:hover { background: rgba(224,98,94,0.12); }
   letter-spacing: 0.3px;
   white-space: nowrap;
 }
+
+/* ── Crate Type Filter ───────────────────────────────────── */
+
+.crate-body {
+  padding: 4px 10px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.crate-toolbar {
+  display: flex;
+  gap: 4px;
+}
+
+.crate-type-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.crate-type-btn {
+  flex: none;
+  padding: 3px 8px;
+  font-size: 11px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: 400;
+  transition: background 0.1s, border-color 0.1s, color 0.1s;
+}
+
+.crate-type-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.crate-type-btn.active {
+  background: rgba(245,166,35,0.15);
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.filter-badge.badge-off {
+  color: var(--text-dim);
+  font-weight: 400;
+}
