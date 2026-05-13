@@ -40,6 +40,7 @@
     lastPipUpdateTime: 0,
     discoveredUnits: new Map(),
     hiddenUnits: new Set(),
+    pipInstances: new Set(),
   };
 
   const POWERUP_LABELS = {
@@ -80,6 +81,7 @@
       const origCGTInit = CGT.CrateGeneratorTrait.prototype.init;
       CGT.CrateGeneratorTrait.prototype.init = function (game) {
         state.crateTraitRef = this;
+        state.discoveredUnits.clear();
         return origCGTInit.apply(this, arguments);
       };
       // Fallback: if "Show Crate Contents" is enabled after init already ran (mid-game),
@@ -286,6 +288,7 @@
       const ret = state.origCreate ? state.origCreate.apply(this, arguments) : undefined;
       try {
         this.__unameLblTracked = true;
+        state.pipInstances.add(this);
         if (this.camera)    state.activeCamera = this.camera;
         if (this.alliances) state.alliances    = this.alliances;
         if (this.viewer)    state.viewer       = this.viewer;
@@ -302,7 +305,10 @@
     };
 
     P.prototype.update = function () {
-      const ret = state.origUpdate ? state.origUpdate.apply(this, arguments) : undefined;
+      let ret;
+      try {
+        ret = state.origUpdate ? state.origUpdate.apply(this, arguments) : undefined;
+      } catch (_) {}
       try {
         state.lastPipUpdateTime = performance.now();
         if (!this.__unameLblTracked) this.__unameLblTracked = true;
@@ -323,6 +329,7 @@
     P.prototype.dispose = function () {
       try {
         detachLabel(this);
+        state.pipInstances.delete(this);
       } catch (e) { warn('dispose patch:', e); }
       if (state.origDispose) return state.origDispose.apply(this, arguments);
     };
@@ -574,7 +581,12 @@
     }
 
     if (state.enabled) {
-      log('apply: labels enabled, showNeutral=' + state.showNeutral + ', fontSize=' + state.fontSize);
+      // Bootstrap: attach labels to all already-known instances immediately,
+      // because idle units may never have their update() called by the game.
+      for (const pip of state.pipInstances) {
+        try { if (!pip.__unameLbl && shouldShowLabel(pip)) attachLabel(pip); } catch (_) {}
+      }
+      log('apply: labels enabled, swept ' + state.pipInstances.size + ' instances');
     } else {
       await sweepLeftoverLabels();
       log('apply: labels disabled, swept');
@@ -649,6 +661,12 @@
     console.table(Object.fromEntries(entries.map(([k, v]) => [k, { displayName: v }])));
     return entries;
   };
+
+  // Eager patch: load classes and install the prototype hooks immediately at
+  // injection time (document_idle). This ensures that units spawned at game
+  // start go through the patched create3DObject and land in pipInstances,
+  // so the apply() sweep can label them even when they are idle.
+  loadClasses().then(ok => { if (ok) patchPrototype(); }).catch(() => {});
 
   // Announce that the page-side is ready
   window.postMessage({ __ra2names: 'ready' }, '*');
