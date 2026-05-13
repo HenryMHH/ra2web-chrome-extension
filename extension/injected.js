@@ -159,6 +159,7 @@
     mesh.matrixAutoUpdate = false;
     mesh.renderOrder = 999998;
     mesh.userData.__unameLbl = true;
+    mesh.userData.__unameLblDisposer = () => { tex.dispose(); mat.dispose(); geom.dispose(); };
 
     return {
       _team: team,
@@ -230,7 +231,7 @@
     state.origDispose = P.prototype.dispose;
 
     P.prototype.create3DObject = function () {
-      const ret = state.origCreate.apply(this, arguments);
+      const ret = state.origCreate ? state.origCreate.apply(this, arguments) : undefined;
       try {
         this.__unameLblTracked = true;
         if (!state.activeCamera && this.camera) state.activeCamera = this.camera;
@@ -262,14 +263,12 @@
       return ret;
     };
 
-    if (state.origDispose) {
-      P.prototype.dispose = function () {
-        try {
-          detachLabel(this);
-        } catch (e) { warn('dispose patch:', e); }
-        return state.origDispose.apply(this, arguments);
-      };
-    }
+    P.prototype.dispose = function () {
+      try {
+        detachLabel(this);
+      } catch (e) { warn('dispose patch:', e); }
+      if (state.origDispose) return state.origDispose.apply(this, arguments);
+    };
 
     state.patched = true;
     log('PipOverlay.prototype patched');
@@ -295,7 +294,7 @@
             if (root) {
               const victims = [];
               root.traverse(o => { if (o && o.userData && o.userData.__unameLbl) victims.push(o); });
-              victims.forEach(o => { if (o.parent) o.parent.remove(o); removed++; });
+              victims.forEach(o => { o.userData.__unameLblDisposer?.(); if (o.parent) o.parent.remove(o); removed++; });
             }
             resolve(removed);
           } catch (e) { warn('sweep failed:', e); resolve(0); }
