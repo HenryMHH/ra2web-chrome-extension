@@ -53,6 +53,9 @@
       } else if (req.cmd === 'status') {
         const res = await pageCmd('status');
         sendResponse(res);
+      } else if (req.cmd === 'getUnitNames') {
+        const res = await pageCmd('getUnitNames');
+        sendResponse(res);
       } else {
         sendResponse({ ok: false, error: 'unknown cmd' });
       }
