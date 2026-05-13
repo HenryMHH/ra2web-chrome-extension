@@ -108,7 +108,6 @@ async function loadSettings() {
   filterMode  = s.filterMode || 'custom';
   renderCrateGrid();
   updateFilterBadge();
-  updateActiveFilterInfo();
 }
 
 async function saveSettings() {
@@ -171,6 +170,9 @@ function renderSnapshotSelect() {
     opt.textContent = `${snap.name} (${shown}/${snap.totalCount})`;
     sel.appendChild(opt);
   });
+  if (selectedPresetIndex >= 0 && selectedPresetIndex < snapshots.length) {
+    sel.value = String(selectedPresetIndex);
+  }
 }
 
 function switchMode(mode) {
@@ -354,7 +356,7 @@ function updateActiveFilterInfo() {
       : `套用中：單場自訂 — 全部顯示`;
     el.className = hidden > 0 ? 'active-filter-info custom has-hidden' : 'active-filter-info custom';
   } else {
-    el.textContent = '';
+    el.textContent = '客製選項：未選取';
     el.className = 'active-filter-info';
   }
 }
@@ -453,7 +455,12 @@ document.getElementById('filter-preset-delete')?.addEventListener('click', async
   const index = Number(raw);
   if (index < 0 || index >= snapshots.length) return;
   await deleteSnapshot(index);
+  if (selectedPresetIndex >= index) {
+    selectedPresetIndex = snapshots.length > 0 ? 0 : -1;
+  }
+  if (snapshots.length === 0) filterMode = 'custom';
   renderSnapshotSelect();
+  updateActiveFilterInfo();
 });
 
 document.getElementById('crate-all')?.addEventListener('click', () => {
@@ -470,6 +477,7 @@ document.getElementById('crate-none')?.addEventListener('click', () => {
 (async () => {
   await loadSettings();
   await loadSnapshots();
+  updateActiveFilterInfo();
   syncLabelRows();
   await probeStatus();
 })();
