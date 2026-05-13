@@ -24,13 +24,15 @@ let snapshots  = [];         // [{ name, hiddenUnits, totalCount }, ...]
 
 async function updateActionIcon(tabId, active) {
   const path = active ? {
-    16: 'icons/running-16.png',
-    32: 'icons/running-32.png',
-    48: 'icons/running-48.png',
+    16:  'icons/running-16.png',
+    32:  'icons/running-32.png',
+    48:  'icons/running-48.png',
+    128: 'icons/running-128.png',
   } : {
-    16: 'icons/stopping-16.png',
-    32: 'icons/stopping-32.png',
-    48: 'icons/stopping-48.png',
+    16:  'icons/stopping-16.png',
+    32:  'icons/stopping-32.png',
+    48:  'icons/stopping-48.png',
+    128: 'icons/stopping-128.png',
   };
   try { await chrome.action.setIcon({ tabId, path }); } catch (_) {}
 }
@@ -165,6 +167,7 @@ async function probeStatus() {
     if (!res) throw new Error('no response');
     if (!res.systemAvailable) {
       setStatus('warn', '遊戲尚未載入完成');
+      await updateActionIcon(tab.id, false);
       els.apply.disabled = false;
       return res;
     }
