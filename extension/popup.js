@@ -9,12 +9,13 @@ const els = {
   chkNeutral: $('chk-neutral'),
   selFontSize: $('sel-fontsize'),
   chkIndicators: $('chk-indicators'),
+  chkCrates: $('chk-crates'),
   apply: $('apply'),
   msg: $('msg'),
 };
 
 const STORAGE_KEY = 'ra2NamesSettings';
-const DEFAULTS = { enabled: false, showNeutral: false, showIndicators: false, fontSize: 14, hiddenUnits: [], filterMode: 'custom' };
+const DEFAULTS = { enabled: false, showNeutral: false, showIndicators: false, showCrateContents: false, fontSize: 14, hiddenUnits: [], filterMode: 'custom' };
 
 let allUnits  = [];   // [[ruleName, displayName], ...]
 let hiddenUnits = new Set();
@@ -67,6 +68,7 @@ async function loadSettings() {
   els.chkNeutral.checked    = !!s.showNeutral;
   els.selFontSize.value     = String(s.fontSize ?? 14);
   els.chkIndicators.checked = !!s.showIndicators;
+  els.chkCrates.checked     = !!s.showCrateContents;
   hiddenUnits = new Set(s.hiddenUnits || []);
   filterMode  = s.filterMode || 'custom';
   updateFilterBadge();
@@ -77,6 +79,7 @@ async function saveSettings() {
     enabled:        els.enabled.checked,
     showNeutral:    els.chkNeutral.checked,
     showIndicators: els.chkIndicators.checked,
+    showCrateContents: els.chkCrates.checked,
     fontSize:       Number(els.selFontSize.value),
     hiddenUnits:    [...hiddenUnits],
     filterMode,
@@ -171,7 +174,7 @@ async function probeStatus() {
       els.apply.disabled = false;
       return res;
     }
-    const active = !!(res.enabled || res.showIndicators);
+    const active = !!(res.enabled || res.showIndicators || res.showCrateContents);
     setStatus('ok', active ? '已啟用' : '已連線');
     await updateActionIcon(tab.id, active);
     els.apply.disabled = false;
@@ -277,7 +280,7 @@ async function applySettings() {
     } else {
       setMsg('ok', opts.enabled ? '已啟用' : '已停用');
       setStatus('ok', opts.enabled ? '已啟用' : '已連線');
-      await updateActionIcon(tab.id, !!(opts.enabled || opts.showIndicators));
+      await updateActionIcon(tab.id, !!(opts.enabled || opts.showIndicators || opts.showCrateContents));
     }
   } catch (e) {
     setMsg('err', '無法傳送指令,請重新整理遊戲頁');
