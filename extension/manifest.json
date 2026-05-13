@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "RA2 Web — Unit Name Labels",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Show each unit's name above it in the Chrono Divide / RA2 Web client. Toggleable via the popup.",
   "permissions": ["storage", "scripting", "activeTab"],
   "host_permissions": [
@@ -10,19 +10,22 @@
     "https://*.ra2web.com/*",
     "https://ra2web.com/*"
   ],
+  "background": {
+    "service_worker": "background.js"
+  },
   "icons": {
-    "16": "icons/icon-16.png",
-    "32": "icons/icon-32.png",
-    "48": "icons/icon-48.png",
-    "128": "icons/icon-128.png"
+    "16": "icons/stopping-16.png",
+    "32": "icons/stopping-32.png",
+    "48": "icons/stopping-48.png",
+    "128": "icons/stopping-128.png"
   },
   "action": {
     "default_title": "RA2 Unit Names",
     "default_popup": "popup.html",
     "default_icon": {
-      "16": "icons/icon-16.png",
-      "32": "icons/icon-32.png",
-      "48": "icons/icon-48.png"
+      "16": "icons/stopping-16.png",
+      "32": "icons/stopping-32.png",
+      "48": "icons/stopping-48.png"
     }
   },
   "content_scripts": [
