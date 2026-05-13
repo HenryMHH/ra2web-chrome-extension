@@ -216,7 +216,12 @@ document.getElementById('filter-all')?.addEventListener('click', () => {
 });
 
 document.getElementById('filter-none')?.addEventListener('click', () => {
-  allUnits.forEach(([ruleName]) => hiddenUnits.add(ruleName));
+  const q = (document.getElementById('filter-search')?.value || '').trim().toLowerCase();
+  const toHide = q
+    ? allUnits.filter(([ruleName, displayName]) =>
+        displayName.toLowerCase().includes(q) || ruleName.toLowerCase().includes(q))
+    : allUnits;
+  toHide.forEach(([ruleName]) => hiddenUnits.add(ruleName));
   updateFilterBadge();
   renderFilterList(document.getElementById('filter-search')?.value || '');
 });

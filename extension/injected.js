@@ -179,7 +179,7 @@
     const team = resolveTeam(self);
     if (team === 'neutral' && !state.showNeutral) return false;
     const ruleName = self.gameObject?.rules?.name;
-    if (ruleName && state.hiddenUnits.has(ruleName)) return false;
+    if (ruleName && state.hiddenUnits.has(ruleName.toUpperCase())) return false;
     return true;
   }
 
@@ -380,7 +380,7 @@
       try {
         for (const go of player.getOwnedObjects()) {
           if (go.isDestroyed || !go.position) continue;
-          if (state.hiddenUnits.size > 0 && state.hiddenUnits.has(go.rules?.name)) continue;
+          if (state.hiddenUnits.size > 0 && state.hiddenUnits.has(go.rules?.name?.toUpperCase())) continue;
           try {
             const wp = go.position.worldPosition;
             _tmpV3.set(wp.x, wp.y, wp.z);
