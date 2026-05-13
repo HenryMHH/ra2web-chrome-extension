@@ -3,9 +3,9 @@
 // window.postMessage).
 
 (() => {
+  const STORAGE_KEY = 'ra2NamesSettings';
+
   // 1. Inject the page-side script into MAIN world.
-  //    We use a <script> tag so the JS runs in the same world as the game.
-  //    web_accessible_resources lets us load it via chrome.runtime.getURL.
   function injectScript() {
     if (document.documentElement.dataset.ra2NamesInjected) return;
     document.documentElement.dataset.ra2NamesInjected = '1';
@@ -25,7 +25,6 @@
       const id = ++seq;
       pending.set(id, resolve);
       window.postMessage({ __ra2names: 'cmd', id, cmd, opts }, '*');
-      // safety timeout — never hang the popup
       setTimeout(() => {
         if (pending.has(id)) {
           pending.delete(id);
@@ -35,12 +34,32 @@
     });
   }
 
-  window.addEventListener('message', (ev) => {
+  window.addEventListener('message', async (ev) => {
     if (ev.source !== window) return;
     const msg = ev.data;
-    if (!msg || msg.__ra2names !== 'res') return;
-    const r = pending.get(msg.id);
-    if (r) { pending.delete(msg.id); r(msg.result); }
+
+    // Route response messages to pending promise resolvers.
+    if (msg && msg.__ra2names === 'res') {
+      const r = pending.get(msg.id);
+      if (r) { pending.delete(msg.id); r(msg.result); }
+      return;
+    }
+
+    // Auto-apply stored settings when injected.js is ready.
+    if (msg && msg.__ra2names === 'ready') {
+      try {
+        const obj = await chrome.storage.local.get(STORAGE_KEY);
+        const s = obj[STORAGE_KEY];
+        if (!s || (!s.enabled && !s.showIndicators)) return;
+        const res = await pageCmd('apply', s);
+        if (res.ok) {
+          chrome.runtime.sendMessage({
+            cmd: 'setIcon',
+            active: !!(s.enabled || s.showIndicators),
+          }).catch(() => {});
+        }
+      } catch (_) {}
+    }
   });
 
   // 3. Listen for popup messages.
