@@ -35,6 +35,7 @@
     overlayCtx: null,
     rafId: null,
     sweepPromise: null,
+    lastPipUpdateTime: 0,
   };
 
   async function loadClasses() {
@@ -258,6 +259,7 @@
     P.prototype.update = function () {
       const ret = state.origUpdate ? state.origUpdate.apply(this, arguments) : undefined;
       try {
+        state.lastPipUpdateTime = performance.now();
         if (!this.__unameLblTracked) this.__unameLblTracked = true;
         if (this.camera)    state.activeCamera = this.camera;
         if (this.alliances) state.alliances    = this.alliances;
@@ -350,6 +352,9 @@
     if (canvas.width !== W)  canvas.width  = W;
     if (canvas.height !== H) canvas.height = H;
     ctx.clearRect(0, 0, W, H);
+
+    // Game loop stopped (game ended) → stay cleared, don't draw stale positions.
+    if (state.lastPipUpdateTime > 0 && performance.now() - state.lastPipUpdateTime > 2000) return;
 
     const camera     = state.activeCamera;
     const MARGIN     = 24;   // px inset from the viewport edge
