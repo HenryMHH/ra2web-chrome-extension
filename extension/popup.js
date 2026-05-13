@@ -14,10 +14,13 @@ const els = {
 };
 
 const STORAGE_KEY = 'ra2NamesSettings';
-const DEFAULTS = { enabled: false, showNeutral: false, showIndicators: false, fontSize: 14, hiddenUnits: [] };
+const DEFAULTS = { enabled: false, showNeutral: false, showIndicators: false, fontSize: 14, hiddenUnits: [], filterMode: 'custom' };
 
 let allUnits  = [];   // [[ruleName, displayName], ...]
 let hiddenUnits = new Set();
+const SNAPSHOTS_KEY = 'ra2NamesSnapshots';
+let filterMode = 'custom';   // 'custom' | 'preset'
+let snapshots  = [];         // [{ name, hiddenUnits, totalCount }, ...]
 
 function setStatus(kind, text) {
   els.status.className = 'status status-' + kind;
@@ -50,6 +53,7 @@ async function loadSettings() {
   els.selFontSize.value     = String(s.fontSize ?? 14);
   els.chkIndicators.checked = !!s.showIndicators;
   hiddenUnits = new Set(s.hiddenUnits || []);
+  filterMode  = s.filterMode || 'custom';
   updateFilterBadge();
 }
 
@@ -60,9 +64,74 @@ async function saveSettings() {
     showIndicators: els.chkIndicators.checked,
     fontSize:       Number(els.selFontSize.value),
     hiddenUnits:    [...hiddenUnits],
+    filterMode,
   };
   await chrome.storage.local.set({ [STORAGE_KEY]: s });
   return s;
+}
+
+async function loadSnapshots() {
+  const obj = await chrome.storage.local.get(SNAPSHOTS_KEY);
+  snapshots = obj[SNAPSHOTS_KEY] || [];
+}
+
+async function saveSnapshots() {
+  await chrome.storage.local.set({ [SNAPSHOTS_KEY]: snapshots });
+}
+
+async function saveSnapshot(name) {
+  const ts = new Date().toISOString();
+  snapshots.push({
+    name: `${name} ${ts}`,
+    hiddenUnits: [...hiddenUnits],
+    totalCount: allUnits.length,
+  });
+  await saveSnapshots();
+}
+
+async function deleteSnapshot(index) {
+  snapshots.splice(index, 1);
+  await saveSnapshots();
+}
+
+function renderSnapshotSelect() {
+  const note = document.getElementById('filter-preset-note');
+  const row  = document.getElementById('filter-preset-row');
+  const sel  = document.getElementById('filter-preset-select');
+  if (!sel) return;
+  sel.innerHTML = '';
+  if (snapshots.length === 0) {
+    if (note) note.style.display = '';
+    if (row)  row.style.display  = 'none';
+    return;
+  }
+  if (note) note.style.display = 'none';
+  if (row)  row.style.display  = '';
+  snapshots.forEach((snap, i) => {
+    const opt = document.createElement('option');
+    opt.value = String(i);
+    const shown = snap.totalCount - snap.hiddenUnits.length;
+    opt.textContent = `${snap.name} (${shown}/${snap.totalCount})`;
+    sel.appendChild(opt);
+  });
+}
+
+function switchMode(mode) {
+  filterMode = mode;
+  const customEl      = document.getElementById('filter-mode-custom');
+  const presetEl      = document.getElementById('filter-mode-preset');
+  const modeCustomBtn = document.getElementById('mode-custom');
+  const modePresetBtn = document.getElementById('mode-preset');
+  const isCustom = mode === 'custom';
+  if (customEl)      customEl.style.display      = isCustom ? '' : 'none';
+  if (presetEl)      presetEl.style.display      = isCustom ? 'none' : '';
+  if (modeCustomBtn) modeCustomBtn.classList.toggle('active', isCustom);
+  if (modePresetBtn) modePresetBtn.classList.toggle('active', !isCustom);
+  if (!isCustom) renderSnapshotSelect();
+  if (isCustom && allUnits.length > 0) {
+    const saveRow = document.getElementById('filter-save-row');
+    if (saveRow) saveRow.style.display = '';
+  }
 }
 
 async function getActiveGameTab() {
@@ -147,6 +216,8 @@ async function loadAndRenderUnitList() {
     if (search)  search.style.display = '';
     if (toolbar) toolbar.style.display = '';
     renderFilterList(search?.value || '');
+    const saveRow = document.getElementById('filter-save-row');
+    if (saveRow) saveRow.style.display = '';
     return;
   }
   if (note) note.textContent = '載入中…';
@@ -168,6 +239,8 @@ async function loadAndRenderUnitList() {
     if (search)  search.style.display = '';
     if (toolbar) toolbar.style.display = '';
     renderFilterList(search?.value || '');
+    const saveRow = document.getElementById('filter-save-row');
+    if (saveRow) saveRow.style.display = '';
   } catch (e) {
     if (note) note.textContent = '無法連線，請重新整理遊戲頁';
   }
@@ -202,7 +275,10 @@ els.apply.addEventListener('click', applySettings);
 els.enabled.addEventListener('change', syncLabelRows);
 
 document.getElementById('section-filter')?.addEventListener('toggle', (e) => {
-  if (e.target.open) loadAndRenderUnitList();
+  if (e.target.open) {
+    switchMode(filterMode);
+    if (filterMode === 'custom') loadAndRenderUnitList();
+  }
 });
 
 document.getElementById('filter-search')?.addEventListener('input', (e) => {
@@ -226,9 +302,46 @@ document.getElementById('filter-none')?.addEventListener('click', () => {
   renderFilterList(document.getElementById('filter-search')?.value || '');
 });
 
+document.getElementById('mode-custom')?.addEventListener('click', () => {
+  switchMode('custom');
+  loadAndRenderUnitList();
+});
+
+document.getElementById('mode-preset')?.addEventListener('click', () => {
+  switchMode('preset');
+});
+
+document.getElementById('filter-save-btn')?.addEventListener('click', async () => {
+  const nameInput = document.getElementById('filter-save-name');
+  const name = (nameInput?.value || '').trim();
+  if (!name) { setMsg('warn', '請輸入快照名稱'); return; }
+  await saveSnapshot(name);
+  if (nameInput) nameInput.value = '';
+  setMsg('ok', `快照「${name}」已儲存`);
+});
+
+document.getElementById('filter-preset-select')?.addEventListener('change', async (e) => {
+  const index = Number(e.target.value);
+  const snap = snapshots[index];
+  if (!snap) return;
+  hiddenUnits = new Set(snap.hiddenUnits);
+  updateFilterBadge();
+  await applySettings();
+});
+
+document.getElementById('filter-preset-delete')?.addEventListener('click', async () => {
+  const sel = document.getElementById('filter-preset-select');
+  if (!sel || snapshots.length === 0) return;
+  const index = Number(sel.value);
+  if (isNaN(index) || index < 0 || index >= snapshots.length) return;
+  await deleteSnapshot(index);
+  renderSnapshotSelect();
+});
+
 // Boot
 (async () => {
   await loadSettings();
+  await loadSnapshots();
   syncLabelRows();
   await probeStatus();
 })();
