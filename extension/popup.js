@@ -3,22 +3,40 @@
 
 const $ = (id) => document.getElementById(id);
 
+const CRATE_TYPES = [
+  { id: 0,  label: '裝甲 ↑' },
+  { id: 1,  label: '火力 ↑' },
+  { id: 2,  label: '基地回復' },
+  { id: 3,  label: '金錢' },
+  { id: 4,  label: '揭示地圖' },
+  { id: 5,  label: '速度 ↑' },
+  { id: 6,  label: '老兵升級' },
+  { id: 7,  label: '免費單位' },
+  { id: 8,  label: '無敵護盾' },
+  { id: 11, label: '礦石' },
+  { id: 13, label: '隱形' },
+  { id: 14, label: '黑暗霧' },
+  { id: 15, label: '爆炸' },
+  { id: 16, label: '核彈' },
+  { id: 17, label: '燃燒' },
+];
+
 const els = {
   status: $('status'),
   enabled: $('enabled'),
   chkNeutral: $('chk-neutral'),
   selFontSize: $('sel-fontsize'),
   chkIndicators: $('chk-indicators'),
-  chkCrates: $('chk-crates'),
   apply: $('apply'),
   msg: $('msg'),
 };
 
 const STORAGE_KEY = 'ra2NamesSettings';
-const DEFAULTS = { enabled: false, showNeutral: false, showIndicators: false, showCrateContents: false, fontSize: 14, hiddenUnits: [], filterMode: 'custom' };
+const DEFAULTS = { enabled: false, showNeutral: false, showIndicators: false, enabledCrateTypes: [], fontSize: 14, hiddenUnits: [], filterMode: 'custom' };
 
 let allUnits  = [];   // [[ruleName, displayName], ...]
 let hiddenUnits = new Set();
+let enabledCrateTypes = new Set();
 const SNAPSHOTS_KEY = 'ra2NamesSnapshots';
 let filterMode = 'custom';   // 'custom' | 'preset'
 let snapshots  = [];         // [{ name, hiddenUnits, totalCount }, ...]
@@ -68,20 +86,28 @@ async function loadSettings() {
   els.chkNeutral.checked    = !!s.showNeutral;
   els.selFontSize.value     = String(s.fontSize ?? 14);
   els.chkIndicators.checked = !!s.showIndicators;
-  els.chkCrates.checked     = !!s.showCrateContents;
+  // Migrate old showCrateContents boolean → enabledCrateTypes array
+  if (Array.isArray(s.enabledCrateTypes)) {
+    enabledCrateTypes = new Set(s.enabledCrateTypes.map(Number));
+  } else if (s.showCrateContents) {
+    enabledCrateTypes = new Set(CRATE_TYPES.map(t => t.id));
+  } else {
+    enabledCrateTypes = new Set();
+  }
   hiddenUnits = new Set(s.hiddenUnits || []);
   filterMode  = s.filterMode || 'custom';
+  renderCrateGrid();
   updateFilterBadge();
 }
 
 async function saveSettings() {
   const s = {
-    enabled:        els.enabled.checked,
-    showNeutral:    els.chkNeutral.checked,
-    showIndicators: els.chkIndicators.checked,
-    showCrateContents: els.chkCrates.checked,
-    fontSize:       Number(els.selFontSize.value),
-    hiddenUnits:    [...hiddenUnits],
+    enabled:          els.enabled.checked,
+    showNeutral:      els.chkNeutral.checked,
+    showIndicators:   els.chkIndicators.checked,
+    enabledCrateTypes: [...enabledCrateTypes],
+    fontSize:         Number(els.selFontSize.value),
+    hiddenUnits:      [...hiddenUnits],
     filterMode,
   };
   await chrome.storage.local.set({ [STORAGE_KEY]: s });
@@ -174,7 +200,7 @@ async function probeStatus() {
       els.apply.disabled = false;
       return res;
     }
-    const active = !!(res.enabled || res.showIndicators || res.showCrateContents);
+    const active = !!(res.enabled || res.showIndicators || (res.enabledCrateTypes?.length > 0));
     setStatus('ok', active ? '已啟用' : '已連線');
     await updateActionIcon(tab.id, active);
     els.apply.disabled = false;
@@ -184,6 +210,42 @@ async function probeStatus() {
     els.apply.disabled = true;
     return null;
   }
+}
+
+function updateCrateBadge() {
+  const badge = document.getElementById('crate-badge');
+  if (!badge) return;
+  const n = enabledCrateTypes.size;
+  if (n === 0) {
+    badge.textContent = '已關閉';
+    badge.className = 'filter-badge badge-off';
+  } else if (n === CRATE_TYPES.length) {
+    badge.textContent = '全部';
+    badge.className = 'filter-badge';
+  } else {
+    badge.textContent = `${n}/${CRATE_TYPES.length}`;
+    badge.className = 'filter-badge';
+  }
+}
+
+function renderCrateGrid() {
+  const grid = document.getElementById('crate-type-grid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  for (const { id, label } of CRATE_TYPES) {
+    const btn = document.createElement('button');
+    btn.className = 'crate-type-btn' + (enabledCrateTypes.has(id) ? ' active' : '');
+    btn.textContent = label;
+    btn.dataset.crateId = String(id);
+    btn.addEventListener('click', () => {
+      if (enabledCrateTypes.has(id)) enabledCrateTypes.delete(id);
+      else enabledCrateTypes.add(id);
+      btn.classList.toggle('active', enabledCrateTypes.has(id));
+      updateCrateBadge();
+    });
+    grid.appendChild(btn);
+  }
+  updateCrateBadge();
 }
 
 function updateFilterBadge() {
@@ -280,7 +342,7 @@ async function applySettings() {
     } else {
       setMsg('ok', opts.enabled ? '已啟用' : '已停用');
       setStatus('ok', opts.enabled ? '已啟用' : '已連線');
-      await updateActionIcon(tab.id, !!(opts.enabled || opts.showIndicators || opts.showCrateContents));
+      await updateActionIcon(tab.id, !!(opts.enabled || opts.showIndicators || opts.enabledCrateTypes.length > 0));
     }
   } catch (e) {
     setMsg('err', '無法傳送指令,請重新整理遊戲頁');
@@ -360,6 +422,16 @@ document.getElementById('filter-preset-delete')?.addEventListener('click', async
   if (index < 0 || index >= snapshots.length) return;
   await deleteSnapshot(index);
   renderSnapshotSelect();
+});
+
+document.getElementById('crate-all')?.addEventListener('click', () => {
+  CRATE_TYPES.forEach(({ id }) => enabledCrateTypes.add(id));
+  renderCrateGrid();
+});
+
+document.getElementById('crate-none')?.addEventListener('click', () => {
+  enabledCrateTypes.clear();
+  renderCrateGrid();
 });
 
 // Boot
