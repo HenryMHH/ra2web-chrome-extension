@@ -339,7 +339,14 @@ async function loadAndRenderUnitList() {
       return;
     }
     allUnits = res.units;
-    if (note)    note.style.display = 'none';
+    if (note) {
+      if (res?.source === 'strings') {
+        note.textContent = '⚠️ 使用備用清單（i18n 字典）— 部份變體單位可能合併為單一條目';
+        note.style.display = '';
+      } else {
+        note.style.display = 'none';
+      }
+    }
     if (search)  search.style.display = '';
     if (toolbar) toolbar.style.display = '';
     renderFilterList(search?.value || '');

@@ -91,6 +91,10 @@
       const origCGTSpawn = CGT.CrateGeneratorTrait.prototype.spawnCrateAt;
       CGT.CrateGeneratorTrait.prototype.spawnCrateAt = function () {
         if (!state.crateTraitRef) state.crateTraitRef = this;
+        // spawnCrateAt(tile, powerup, game, ...) — third arg is the live Game.
+        // Captures gameRef for the "extension reloaded mid-match" path where init
+        // already fired before our patches were installed.
+        if (!state.gameRef && arguments[2]) state.gameRef = arguments[2];
         return origCGTSpawn.apply(this, arguments);
       };
       return !!(state.PipOverlay && state.CanvasUtils && state.SpriteUtils && state.Coords);
