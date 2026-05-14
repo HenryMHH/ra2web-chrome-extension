@@ -427,20 +427,27 @@ document.getElementById('filter-search')?.addEventListener('input', (e) => {
 });
 
 document.getElementById('filter-all')?.addEventListener('click', () => {
-  hiddenUnitsCustom.clear();
+  const q = (document.getElementById('filter-search')?.value || '').trim().toLowerCase();
+  const visible = q
+    ? allUnits.filter(([ruleName, displayName]) =>
+        displayName.toLowerCase().includes(q) || ruleName.toLowerCase().includes(q))
+    : allUnits;
+  visible.forEach(([ruleName]) => hiddenUnitsCustom.delete(ruleName));
   updateFilterBadge();
-  renderFilterList(document.getElementById('filter-search')?.value || '');
+  updateFilterCountLabel();
+  renderFilterList(q);
 });
 
 document.getElementById('filter-none')?.addEventListener('click', () => {
   const q = (document.getElementById('filter-search')?.value || '').trim().toLowerCase();
-  const toHide = q
+  const visible = q
     ? allUnits.filter(([ruleName, displayName]) =>
         displayName.toLowerCase().includes(q) || ruleName.toLowerCase().includes(q))
     : allUnits;
-  toHide.forEach(([ruleName]) => hiddenUnitsCustom.add(ruleName));
+  visible.forEach(([ruleName]) => hiddenUnitsCustom.add(ruleName));
   updateFilterBadge();
-  renderFilterList(document.getElementById('filter-search')?.value || '');
+  updateFilterCountLabel();
+  renderFilterList(q);
 });
 
 document.getElementById('mode-custom')?.addEventListener('click', () => {
