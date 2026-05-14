@@ -272,9 +272,16 @@ function updateFilterBadge() {
   badge.textContent = hiddenUnitsCustom.size > 0 ? `${hiddenUnitsCustom.size} 已隱藏` : '';
 }
 
+function updateFilterCountLabel() {
+  const countLabel = document.getElementById('filter-count-label');
+  if (!countLabel) return;
+  const total   = allUnits.length;
+  const checked = Math.max(0, total - hiddenUnitsCustom.size);
+  countLabel.textContent = total > 0 ? `已勾選 ${checked} / ${total}` : '';
+}
+
 function renderFilterList(searchText = '') {
   const container = document.getElementById('filter-list');
-  const countLabel = document.getElementById('filter-count-label');
   if (!container) return;
   const q = searchText.trim().toLowerCase();
   const filtered = allUnits.filter(([ruleName, displayName]) =>
@@ -292,6 +299,7 @@ function renderFilterList(searchText = '') {
       if (cb.checked) hiddenUnitsCustom.delete(ruleName);
       else hiddenUnitsCustom.add(ruleName);
       updateFilterBadge();
+      updateFilterCountLabel();
     });
     const nameSpan = document.createElement('span');
     nameSpan.className = 'filter-item-name';
@@ -302,7 +310,7 @@ function renderFilterList(searchText = '') {
     label.append(cb, nameSpan, ruleSpan);
     container.appendChild(label);
   });
-  if (countLabel) countLabel.textContent = `${filtered.length} / ${allUnits.length}`;
+  updateFilterCountLabel();
 }
 
 async function loadAndRenderUnitList() {
