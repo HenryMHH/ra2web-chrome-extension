@@ -85,6 +85,14 @@ strings.get(rules.uiName);     // 本地化後的顯示文字
 strings.data;                  // 整份 i18n table,key 形如 "name:E1"
 ```
 
+**單位清單的來源(三段 fallback)**
+
+1. `state.gameRef.rules.{infantry,vehicle,aircraft,building}Rules` — 當局實際載入的 rules Map,key 為 `rules.name`,value 為 rule object;displayName 由 `strings.get(rule.uiName)` 解析。**首選**,鎖定當局 rule 集合,且與 `shouldShowLabel` 的比對 key 同字典。
+2. `state.discoveredUnits` — 從 `PipOverlay.create3DObject` patch 累積的當局實際出場單位。
+3. `state.strings.data` 的 `name:*` keys — i18n 字典,bundle 內固定,所有局共用。**僅作最後 fallback**,因為多個 rule 共享同一 `uiName` 時(例如 ADOG / DOG / SDOG 共享 `name:DOG`)會合併成單一條目,造成「勾 DOG 不會隱藏 ADOG」這類 mismatch。
+
+`state.gameRef` 在 `CrateGeneratorTrait.prototype.init(game)` patch 中捕獲(同一 patch 已用於 `state.crateTraitRef`)。
+
 ### 取得「玩家列表」(掃描畫面外敵人用)
 
 ```js
@@ -472,6 +480,7 @@ content.js 收到 injected.js 發出的 `{__ra2names:'ready'}` 後,**自動 appl
 10. **canvas 自動放大會清空原本像素** — `CanvasUtils.drawText` 的 `autoEnlargeCanvas: true` 會在文字超出時擴大畫布並清空。先 `getImageData` 備份再 `putImageData(imgData, 1, 1)` shift 1px 還原(順便當作描邊預留空間)
 11. **showCrateContents 從 boolean 演進到 enabledCrateTypes 陣列** — popup `loadSettings` 仍處理舊 key migration,把舊的全 on boolean 視為「全部 powerup type 勾選」
 12. **filter 兩種模式儲存設計** — `hiddenUnits` 是執行期最終結果;`hiddenUnitsCustom` 是 custom 模式編輯狀態;`snapshots` 是 preset 來源。三者不要混淆
+13. **單位篩選清單與 `rules.name` key 字典不一致** — 早期版本用 `strings.data` 的 `name:*` keys 列清單,但實際隱藏比對 `gameObject.rules.name`。當多個 rule 共享同一 `uiName`(例如 ADOG / SDOG 共享 `name:DOG`),清單只看得到 `DOG`,勾選後 `hiddenUnits.has('ADOG')` 仍回 false → 標籤不消失。改以 `state.gameRef.rules` 之 `{infantry,vehicle,aircraft,building}Rules` Map 為主要來源,key 與比對端同字典。
 
 ---
 
