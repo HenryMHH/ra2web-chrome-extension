@@ -170,9 +170,12 @@ function renderSnapshotSelect() {
     opt.textContent = `${snap.name} (${shown}/${snap.totalCount})`;
     sel.appendChild(opt);
   });
-  if (selectedPresetIndex >= 0 && selectedPresetIndex < snapshots.length) {
-    sel.value = String(selectedPresetIndex);
+  // Normalize: keep state in sync with what dropdown visually shows.
+  // Browser auto-displays first option, so default invalid index to 0.
+  if (selectedPresetIndex < 0 || selectedPresetIndex >= snapshots.length) {
+    selectedPresetIndex = 0;
   }
+  sel.value = String(selectedPresetIndex);
 }
 
 function switchMode(mode) {
@@ -438,13 +441,13 @@ document.getElementById('filter-save-btn')?.addEventListener('click', async () =
   setMsg('ok', `快照「${name}」已儲存`);
 });
 
-document.getElementById('filter-preset-select')?.addEventListener('change', async (e) => {
+document.getElementById('filter-preset-select')?.addEventListener('change', (e) => {
   const raw = e.target.value;
   if (raw === '') return;
   const index = Number(raw);
   if (!snapshots[index]) return;
   selectedPresetIndex = index;
-  await applySettings();
+  // Apply deferred to the Apply button — no auto-commit on selection change.
 });
 
 document.getElementById('filter-preset-delete')?.addEventListener('click', async () => {
