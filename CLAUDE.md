@@ -12,6 +12,13 @@
 
 來源檔案:`ra2web.min.js`,~4.2MB / ~9.6 萬行 minified JS。
 
+### 執行期依賴版本
+
+| 依賴 | 版本 | 備註 |
+|------|------|------|
+| three.js | **~r94 (v0.94, 2018-06)** | `Matrix4` 只有 `getInverse(m)`,**沒有** `.invert()`。`.invert()` 是 r123(2021-01)才加;`getInverse` 在 r147(2022-09)被移除。寫任何 THREE API 之前都要先確認 r94 有沒有,或用 feature-detect。|
+| SystemJS | `System.register` 形式 | 保留完整模組名,所以即使 minified 也能 `System.import('engine/...')` 拿到。|
+
 ---
 
 ## 一、原始碼分析
@@ -481,7 +488,16 @@ content.js 收到 injected.js 發出的 `{__ra2names:'ready'}` 後,**自動 appl
 11. **showCrateContents 從 boolean 演進到 enabledCrateTypes 陣列** — popup `loadSettings` 仍處理舊 key migration,把舊的全 on boolean 視為「全部 powerup type 勾選」
 12. **filter 兩種模式儲存設計** — `hiddenUnits` 是執行期最終結果;`hiddenUnitsCustom` 是 custom 模式編輯狀態;`snapshots` 是 preset 來源。三者不要混淆
 13. **單位篩選清單與 `rules.name` key 字典不一致** — 早期版本用 `strings.data` 的 `name:*` keys 列清單,但實際隱藏比對 `gameObject.rules.name`。當多個 rule 共享同一 `uiName`(例如 ADOG / SDOG 共享 `name:DOG`),清單只看得到 `DOG`,勾選後 `hiddenUnits.has('ADOG')` 仍回 false → 標籤不消失。改以 `state.gameRef.rules` 之 `{infantry,vehicle,aircraft,building}Rules` Map 為主要來源,key 與比對端同字典。
-14. **drawOverlay 用的 camera matrixWorldInverse 在 render() 外不會自動更新** — Three.js 只在 `WebGLRenderer.render()` 內部更新 camera.matrixWorldInverse。如果我們的 RAF 比遊戲的 render call 先跑,projection 會用上一幀的矩陣,結果寶箱標籤每幀都落後相機一格,看起來像「跟著螢幕飄」。在 drawOverlay 內手動 `camera.updateMatrixWorld(); camera.matrixWorldInverse.copy(camera.matrixWorld).invert();` 後再投影即可解決。畫面外指標因為會 clamp 到邊緣所以看不出來,但寶箱這種精準定位就會露餡。
+14. **drawOverlay 用的 camera matrixWorldInverse 在 render() 外不會自動更新** — Three.js 只在 `WebGLRenderer.render()` 內部更新 camera.matrixWorldInverse。如果我們的 RAF 比遊戲的 render call 先跑,projection 會用上一幀的矩陣,結果寶箱標籤每幀都落後相機一格,看起來像「跟著螢幕飄」。在 drawOverlay 內手動 `camera.updateMatrixWorld()` 後反矩陣再投影即可解決。畫面外指標因為會 clamp 到邊緣所以看不出來,但寶箱這種精準定位就會露餡。
+15. **`Matrix4.invert()` 在 r94 不存在** — 接續坑 #14,反矩陣寫法要 feature-detect:
+    ```js
+    if (typeof camera.matrixWorldInverse.invert === 'function') {
+      camera.matrixWorldInverse.copy(camera.matrixWorld).invert();  // r123+
+    } else {
+      camera.matrixWorldInverse.getInverse(camera.matrixWorld);      // r94 (~r122 以前)
+    }
+    ```
+    遊戲打包的是 r94,只能走 `getInverse`。直接寫 `.copy(m).invert()` 會炸 `TypeError: ...invert is not a function`。寫 THREE API 前先對版本表(見上方執行期依賴)。
 
 ---
 

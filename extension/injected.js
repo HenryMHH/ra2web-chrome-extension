@@ -489,7 +489,17 @@
     // use last frame's matrix and labels would lag one frame behind the camera — visible
     // as a label that "moves with the screen" instead of staying on the crate.
     camera.updateMatrixWorld();
-    camera.matrixWorldInverse.copy(camera.matrixWorld).invert();
+    // Matrix4 inversion API differs by THREE revision:
+    //   r123+ (2021-01): Matrix4.prototype.invert() — idiom: m.copy(other).invert()
+    //   r122 and older : no .invert(); must use m.getInverse(other)
+    //   r147+ (2022-09): getInverse() removed entirely
+    // This game bundles ~r94 (THREE v0.94, 2018-06) so getInverse is the live path today.
+    // Feature-detect on .invert so the code keeps working if the game ever upgrades THREE.
+    if (typeof camera.matrixWorldInverse.invert === 'function') {
+      camera.matrixWorldInverse.copy(camera.matrixWorld).invert();
+    } else {
+      camera.matrixWorldInverse.getInverse(camera.matrixWorld);
+    }
 
     if (state.showIndicators) {
       const MARGIN     = 24;   // px inset from the viewport edge
