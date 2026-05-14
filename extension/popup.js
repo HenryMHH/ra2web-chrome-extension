@@ -327,9 +327,15 @@ async function loadAndRenderUnitList() {
   try {
     const res = await chrome.tabs.sendMessage(tab.id, { __ra2names: true, cmd: 'getUnitNames' });
     if (!res || !res.units || res.units.length === 0) {
-      if (note) note.textContent = res?.source === 'none'
-        ? '進入對局後單位清單才會出現'
-        : '無法取得單位清單';
+      if (note) {
+        if (res?.source === 'none') {
+          note.textContent = '進入對局後單位清單才會出現';
+        } else if (res?.source === 'strings') {
+          note.textContent = '尚未進入對局，顯示的是備用清單，部份變體單位可能未列出';
+        } else {
+          note.textContent = '無法取得單位清單';
+        }
+      }
       return;
     }
     allUnits = res.units;
