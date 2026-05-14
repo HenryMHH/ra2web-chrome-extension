@@ -82,6 +82,7 @@
       const origCGTInit = CGT.CrateGeneratorTrait.prototype.init;
       CGT.CrateGeneratorTrait.prototype.init = function (game) {
         state.crateTraitRef = this;
+        state.gameRef = game || null;
         state.discoveredUnits.clear();
         return origCGTInit.apply(this, arguments);
       };
