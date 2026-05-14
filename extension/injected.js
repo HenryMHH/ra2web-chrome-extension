@@ -484,6 +484,12 @@
     if (state.lastPipUpdateTime > 0 && performance.now() - state.lastPipUpdateTime > 2000) return;
 
     const camera = state.activeCamera;
+    // matrixWorldInverse is normally refreshed inside WebGLRenderer.render(). If our RAF
+    // happens to run before the game's render call this frame, Vector3.project() would
+    // use last frame's matrix and labels would lag one frame behind the camera — visible
+    // as a label that "moves with the screen" instead of staying on the crate.
+    camera.updateMatrixWorld();
+    camera.matrixWorldInverse.copy(camera.matrixWorld).invert();
 
     if (state.showIndicators) {
       const MARGIN     = 24;   // px inset from the viewport edge
