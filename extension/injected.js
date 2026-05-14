@@ -612,6 +612,38 @@
     return { ok: true, state: { enabled: state.enabled, showNeutral: state.showNeutral, showIndicators: state.showIndicators, enabledCrateTypes: [...state.enabledCrateTypes], fontSize: state.fontSize } };
   }
 
+  // Walks the live Rules Maps and yields one row per unit-typed rule entry.
+  // Returns null if the game ref or any required map is unavailable.
+  function enumerateRulesUnits() {
+    const rules = state.gameRef?.rules;
+    if (!rules) return null;
+    const maps = [
+      ['infantry', rules.infantryRules],
+      ['vehicle',  rules.vehicleRules],
+      ['aircraft', rules.aircraftRules],
+      ['building', rules.buildingRules],
+    ];
+    const rows = [];
+    for (const [objectType, m] of maps) {
+      if (!m || typeof m.forEach !== 'function') continue;
+      m.forEach((rule, ruleName) => {
+        if (!ruleName) return;
+        let displayName = ruleName;
+        const key = rule?.uiName;
+        if (key && state.strings) {
+          try {
+            const v = state.strings.get(key);
+            if (v) displayName = v;
+          } catch (_) {}
+        }
+        rows.push([String(ruleName).toUpperCase(), displayName, objectType]);
+      });
+    }
+    if (rows.length === 0) return null;
+    rows.sort((a, b) => a[1].localeCompare(b[1], 'zh-Hant'));
+    return rows;
+  }
+
   function getUnitNames() {
     if (state.strings?.data) {
       const units = Object.entries(state.strings.data)
