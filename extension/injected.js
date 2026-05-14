@@ -36,6 +36,7 @@
     overlayCtx: null,
     rafId: null,
     crateTraitRef: null,
+    gameRef: null,
     sweepPromise: null,
     lastPipUpdateTime: 0,
     discoveredUnits: new Map(),
