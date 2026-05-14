@@ -645,17 +645,22 @@
   }
 
   function getUnitNames() {
+    const fromRules = enumerateRulesUnits();
+    if (fromRules) {
+      return { units: fromRules, source: 'rules' };
+    }
+    if (state.discoveredUnits.size > 0) {
+      const units = [...state.discoveredUnits.entries()]
+        .map(([k, v]) => [String(k).toUpperCase(), v])
+        .sort((a, b) => a[1].localeCompare(b[1], 'zh-Hant'));
+      return { units, source: 'discovered' };
+    }
     if (state.strings?.data) {
       const units = Object.entries(state.strings.data)
         .filter(([k]) => k.startsWith('name:'))
         .map(([k, v]) => [k.slice(5).toUpperCase(), v])
         .sort((a, b) => a[1].localeCompare(b[1], 'zh-Hant'));
       return { units, source: 'strings' };
-    }
-    if (state.discoveredUnits.size > 0) {
-      const units = [...state.discoveredUnits.entries()]
-        .sort((a, b) => a[1].localeCompare(b[1], 'zh-Hant'));
-      return { units, source: 'discovered' };
     }
     return { units: [], source: 'none' };
   }
