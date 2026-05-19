@@ -6,6 +6,13 @@ import { isDev, isFirefox, port, r } from '../scripts/utils'
 export async function getManifest() {
   const pkg = (await fs.readJSON(r('package.json'))) as typeof PkgType
 
+  const RA2_MATCHES = [
+    'https://game.chronodivide.com/*',
+    'https://chronodivide.com/*',
+    'https://*.ra2web.com/*',
+    'https://ra2web.com/*',
+  ]
+
   // update this file to update this manifest.json
   // can also be conditional based on your need
   const manifest: Manifest.WebExtensionManifest = {
@@ -30,13 +37,13 @@ export async function getManifest() {
         },
 
     permissions: ['tabs', 'storage', 'activeTab', 'sidePanel'],
-    // host_permissions: ['*://*/*'],
-    host_permissions: ['https://www.jutebag.com.tw/*'],
+    host_permissions: RA2_MATCHES,
     content_scripts: [
       {
-        matches: ['<all_urls>'],
+        matches: RA2_MATCHES,
         js: ['dist/contentScripts/index.global.js'],
         run_at: 'document_idle',
+        all_frames: true,
       },
     ],
     web_accessible_resources: [
@@ -45,7 +52,7 @@ export async function getManifest() {
           'dist/contentScripts/style.css',
           'dist/injectedScripts/index.global.js',
         ],
-        matches: ['<all_urls>'],
+        matches: RA2_MATCHES,
       },
     ],
     content_security_policy: {
