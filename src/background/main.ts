@@ -1,3 +1,4 @@
+import 'webext-bridge/background'
 import type { Tabs } from 'webextension-polyfill'
 import { ICONS } from '~/constants/icons'
 import { initIcon, updateIcon } from '~/logic/tab-status'
