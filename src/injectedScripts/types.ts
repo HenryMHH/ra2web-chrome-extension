@@ -37,7 +37,7 @@ export interface GameObjectLike {
 export interface PipOverlayLike {
   gameObject?: {
     rules?: { name?: string, uiName?: string }
-    owner?: GameOwner | unknown
+    owner?: GameOwner
   }
   rootObj?: THREE.Object3D & { matrixWorldNeedsUpdate: boolean }
   camera?: THREE.Camera
