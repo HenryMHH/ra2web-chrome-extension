@@ -22,7 +22,7 @@ export async function getManifest() {
     version: pkg.version,
     description: pkg.description,
     action: {
-      default_popup: 'dist/popup/index.html',
+      default_title: 'Ra2Web Assistant',
     },
     options_ui: {
       page: 'dist/options/index.html',
