@@ -3,15 +3,16 @@ import type { Manifest } from 'webextension-polyfill'
 import type PkgType from '../package.json'
 import { isDev, isFirefox, port, r } from '../scripts/utils'
 
+// MV3 match patterns: '*.ra2web.com' covers subdomains but the apex 'ra2web.com' must be listed separately.
+export const RA2_MATCHES = [
+  'https://game.chronodivide.com/*',
+  'https://chronodivide.com/*',
+  'https://*.ra2web.com/*',
+  'https://ra2web.com/*',
+] as const
+
 export async function getManifest() {
   const pkg = (await fs.readJSON(r('package.json'))) as typeof PkgType
-
-  const RA2_MATCHES = [
-    'https://game.chronodivide.com/*',
-    'https://chronodivide.com/*',
-    'https://*.ra2web.com/*',
-    'https://ra2web.com/*',
-  ]
 
   // update this file to update this manifest.json
   // can also be conditional based on your need
@@ -37,10 +38,10 @@ export async function getManifest() {
         },
 
     permissions: ['tabs', 'storage', 'activeTab', 'sidePanel'],
-    host_permissions: RA2_MATCHES,
+    host_permissions: RA2_MATCHES as unknown as string[],
     content_scripts: [
       {
-        matches: RA2_MATCHES,
+        matches: RA2_MATCHES as unknown as string[],
         js: ['dist/contentScripts/index.global.js'],
         run_at: 'document_idle',
         all_frames: true,
@@ -52,7 +53,7 @@ export async function getManifest() {
           'dist/contentScripts/style.css',
           'dist/injectedScripts/index.global.js',
         ],
-        matches: RA2_MATCHES,
+        matches: RA2_MATCHES as unknown as string[],
       },
     ],
     content_security_policy: {
