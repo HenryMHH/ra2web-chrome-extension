@@ -39,6 +39,7 @@
     "@playwright/test": "^1.46.1",
     "@types/fs-extra": "^11.0.4",
     "@types/node": "^22.5.0",
+    "@types/three": "^0.184.1",
     "@types/webextension-polyfill": "^0.12.0",
     "@typescript-eslint/eslint-plugin": "^8.2.0",
     "@unocss/reset": "^0.62.2",
