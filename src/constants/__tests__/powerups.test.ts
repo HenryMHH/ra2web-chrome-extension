@@ -2,11 +2,11 @@ import { describe, expect, it } from 'vitest'
 import { CRATE_TYPES, POWERUP_LABELS } from '~/constants/powerups'
 
 describe('powerups', () => {
-  it('cRATE_TYPES contains 15 entries', () => {
+  it('exposes 15 crate type entries', () => {
     expect(CRATE_TYPES).toHaveLength(15)
   })
 
-  it('pOWERUP_LABELS and CRATE_TYPES are in sync', () => {
+  it('keeps POWERUP_LABELS in sync with CRATE_TYPES', () => {
     for (const t of CRATE_TYPES) expect(POWERUP_LABELS[t.id]).toBe(t.label)
     expect(Object.keys(POWERUP_LABELS)).toHaveLength(CRATE_TYPES.length)
   })
