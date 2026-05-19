@@ -1,4 +1,5 @@
 import type { Tabs } from 'webextension-polyfill'
+import { ICONS } from '~/constants/icons'
 import { initIcon, updateIcon } from '~/logic/tab-status'
 
 // only on dev mode
@@ -23,6 +24,17 @@ if (USE_SIDE_PANEL) {
 browser.runtime.onInstalled.addListener((): void => {
   // eslint-disable-next-line no-console
   console.log('Extension installed')
+})
+
+browser.runtime.onMessage.addListener((msg: any, sender): undefined => {
+  if (!msg || msg.cmd !== 'setIcon')
+    return
+  const tabId = sender.tab?.id
+  const path = msg.active ? ICONS.active : ICONS.inactive
+  if (tabId != null)
+    browser.action.setIcon({ tabId, path: path as any }).catch(() => {})
+  else
+    browser.action.setIcon({ path: path as any }).catch(() => {})
 })
 
 let previousTabId = 0
