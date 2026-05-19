@@ -6,7 +6,9 @@ const [show, toggle] = useToggle(false)
 </script>
 
 <template>
-  <div class="fixed right-0 bottom-0 m-5 z-100 flex items-end font-sans select-none leading-1em">
+  <div
+    class="fixed right-0 bottom-0 m-5 z-100 flex items-end font-sans select-none leading-1em"
+  >
     <div
       v-show="show"
       class="bg-white text-gray-800 rounded-lg shadow w-max h-min"
@@ -16,7 +18,7 @@ const [show, toggle] = useToggle(false)
       :class="show ? 'opacity-100' : 'opacity-0'"
     >
       <h1 class="text-lg">
-        Vitesse WebExt
+        Vitesse WebEx11231t
       </h1>
       <SharedSubtitle />
     </div>

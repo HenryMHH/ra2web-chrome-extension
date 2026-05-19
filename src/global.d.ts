@@ -6,3 +6,7 @@ declare module '*.vue' {
   const component: any
   export default component
 }
+
+declare const System: {
+  import: <T = any>(moduleName: string) => Promise<T>
+}

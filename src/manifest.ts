@@ -4,7 +4,7 @@ import type PkgType from '../package.json'
 import { isDev, isFirefox, port, r } from '../scripts/utils'
 
 export async function getManifest() {
-  const pkg = await fs.readJSON(r('package.json')) as typeof PkgType
+  const pkg = (await fs.readJSON(r('package.json'))) as typeof PkgType
 
   // update this file to update this manifest.json
   // can also be conditional based on your need
@@ -14,7 +14,6 @@ export async function getManifest() {
     version: pkg.version,
     description: pkg.description,
     action: {
-      default_icon: 'assets/icon-512.png',
       default_popup: 'dist/popup/index.html',
     },
     options_ui: {
@@ -29,38 +28,30 @@ export async function getManifest() {
       : {
           service_worker: 'dist/background/index.mjs',
         },
-    icons: {
-      16: 'assets/icon-512.png',
-      48: 'assets/icon-512.png',
-      128: 'assets/icon-512.png',
-    },
-    permissions: [
-      'tabs',
-      'storage',
-      'activeTab',
-      'sidePanel',
-    ],
-    host_permissions: ['*://*/*'],
+
+    permissions: ['tabs', 'storage', 'activeTab', 'sidePanel'],
+    // host_permissions: ['*://*/*'],
+    host_permissions: ['https://www.jutebag.com.tw/*'],
     content_scripts: [
       {
-        matches: [
-          '<all_urls>',
-        ],
-        js: [
-          'dist/contentScripts/index.global.js',
-        ],
+        matches: ['<all_urls>'],
+        js: ['dist/contentScripts/index.global.js'],
+        run_at: 'document_idle',
       },
     ],
     web_accessible_resources: [
       {
-        resources: ['dist/contentScripts/style.css'],
+        resources: [
+          'dist/contentScripts/style.css',
+          'dist/injectedScripts/index.global.js',
+        ],
         matches: ['<all_urls>'],
       },
     ],
     content_security_policy: {
+      // this is required on dev for Vite script to load
       extension_pages: isDev
-        // this is required on dev for Vite script to load
-        ? `script-src \'self\' http://localhost:${port}; object-src \'self\'`
+        ? `script-src 'self' http://localhost:${port}; object-src 'self'`
         : 'script-src \'self\'; object-src \'self\'',
     },
   }

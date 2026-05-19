@@ -1,13 +1,16 @@
 <script setup lang="ts">
+import { useCurrentUrl } from '~/composables/useCurrentUrl'
 import { storageDemo } from '~/logic/storage'
 
 function openOptionsPage() {
   browser.runtime.openOptionsPage()
 }
+
+const currentUrl = useCurrentUrl()
 </script>
 
 <template>
-  <main class="w-full px-4 py-5 text-center text-gray-700">
+  <main class="w-full px-4 py-5 text-center text-gray-700 border">
     <Logo />
     <div>Sidepanel</div>
     <SharedSubtitle />
@@ -18,5 +21,7 @@ function openOptionsPage() {
     <div class="mt-2">
       <span class="opacity-50">Storage:</span> {{ storageDemo }}
     </div>
+
+    {{ currentUrl }}
   </main>
 </template>
