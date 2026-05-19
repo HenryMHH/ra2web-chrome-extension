@@ -1,11 +1,23 @@
 import { ICONS } from '~/constants/icons'
 
+const RA2_HOST_PATTERNS = [
+  'game.chronodivide.com',
+  'chronodivide.com',
+  'ra2web.com',
+]
+
 function getIsRa2Url(url?: string) {
   // 當權限不足 or tab 還在初始化的時候， url 可能是 undefined
   if (!url)
     return false
 
-  return url.includes('https://game.ra2web.com')
+  try {
+    const { hostname } = new URL(url)
+    return RA2_HOST_PATTERNS.some(p => hostname === p || hostname.endsWith(`.${p}`))
+  }
+  catch {
+    return false
+  }
 }
 
 export async function updateIcon(tabId: number) {
