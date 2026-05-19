@@ -342,53 +342,105 @@ Snapshots 儲存在獨立 key `ra2NamesSnapshots`(陣列),每筆:
 
 ## 六、Chrome Extension 結構
 
-### 檔案
+### 檔案（vitesse-webext 架構）
 
 ```
-extension/
-├── manifest.json   (MV3)
-├── background.js   (service worker,僅管 icon 切換)
-├── content.js      (isolated world,訊息中繼)
-├── injected.js     (MAIN world,實際 patch + overlay)
-├── popup.html      (UI)
-├── popup.css
-├── popup.js
-└── icons/
-    ├── running-{16,32,48,128}.png   (啟用中)
-    └── stopping-{16,32,48,128}.png  (停用中)
+src/
+├── manifest.ts                # 動態產生 manifest.json
+├── background/main.ts         # service worker（icon 切換 + setIcon listener）
+├── contentScripts/
+│   ├── index.ts               # isolated world：注入 + auto-apply + webext-bridge 中繼
+│   └── utils/
+│       ├── dom.ts             # injectScript helper
+│       └── pageBridge.ts      # pageCmd promise wrapper + onPageReady
+├── injectedScripts/
+│   ├── index.ts               # IIFE 入口
+│   ├── types.ts               # Team / ApplyOpts / LabelCache / PipOverlayLike
+│   ├── state/
+│   │   ├── settings.ts        # 使用者設定 store
+│   │   ├── runtime.ts         # SystemJS refs + 遊戲執行期物件
+│   │   ├── tracking.ts        # PipOverlay 集合 + labelCache WeakMap
+│   │   ├── overlay.ts         # overlay canvas / RAF / sweep promise
+│   │   └── log.ts             # TAG / log / warn
+│   ├── system/
+│   │   ├── loader.ts          # loadClasses + CrateGeneratorTrait patch
+│   │   └── three-compat.ts    # invertM4 (r94 vs r123+)
+│   ├── pip/
+│   │   ├── resolvers.ts       # resolveTeam / resolveName / resolveNameFromGo
+│   │   └── patch.ts           # PipOverlay.prototype hooks
+│   ├── label/
+│   │   ├── build.ts           # buildLabel → THREE.Mesh
+│   │   ├── policy.ts          # shouldShowLabel
+│   │   ├── lifecycle.ts       # attach / refresh / detach
+│   │   └── sweep.ts           # sweepLeftoverLabels (WebGLRenderer hook)
+│   ├── overlay/
+│   │   ├── canvas.ts          # init / remove
+│   │   ├── indicators.ts      # 畫面外箭頭
+│   │   ├── crates.ts          # 寶箱標籤
+│   │   └── draw.ts            # RAF orchestrator
+│   ├── rules/
+│   │   └── enumerate.ts       # enumerateRulesUnits / getUnitNames
+│   ├── bridge/
+│   │   ├── commands.ts        # apply / getStatus / handlers map
+│   │   └── messaging.ts       # window.postMessage 收發
+│   └── __tests__/             # vitest: resolvers / policy / three-compat / enumerate
+├── popup/
+│   ├── Popup.vue              # 組合元件 + composables
+│   ├── main.ts
+│   ├── index.html
+│   ├── composables/
+│   │   ├── useRa2Settings.ts
+│   │   ├── useRa2Snapshots.ts
+│   │   └── useRa2Bridge.ts
+│   └── components/
+│       ├── MainToggleRow.vue
+│       ├── FontSizeRow.vue
+│       ├── IndicatorsRow.vue
+│       ├── CrateGrid.vue
+│       ├── UnitFilter.vue
+│       └── StatusBar.vue
+├── constants/
+│   ├── icons.ts
+│   └── powerups.ts            # popup + injected 共用 CRATE_TYPES / POWERUP_LABELS
+├── logic/
+│   ├── storage.ts
+│   └── tab-status.ts          # RA2 hostname 匹配 + updateIcon
+└── types/
+    └── webext-bridge.d.ts     # popup↔content ProtocolMap
+
+extension/                     # build 產物（勿手動編輯）
+├── manifest.json              # 由 src/manifest.ts 產生
+└── dist/
+    ├── background/index.mjs
+    ├── contentScripts/index.global.js
+    ├── injectedScripts/index.global.js
+    └── popup/index.html
 ```
 
 ### 通訊架構
 
-```
-popup.html/js  ←—chrome.runtime.sendMessage—→  content.js
-                                                    ↓
-                                              window.postMessage
-                                                    ↓
-                                              injected.js (MAIN world)
-                                                    ↓
-                                          SystemJS / THREE / PipOverlay.prototype
-                                          CrateGeneratorTrait.prototype
+popup（webext-bridge `sendMessage`） → content script（webext-bridge `onMessage`）
+content script（`pageCmd` via `window.postMessage`） → injected script（`registerMessaging`）
+injected script 回 `{__ra2names:'res'}` → content script `pageCmd` resolve → popup
 
-popup.js / content.js  ─chrome.runtime.sendMessage({cmd:'setIcon'})→  background.js
-                                                                          ↓
-                                                                   chrome.action.setIcon
-```
+content script 收到 `{__ra2names:'ready'}` 後自動讀 `chrome.storage.local['ra2NamesSettings']` 並 apply。
+
+content script / popup → background：`chrome.runtime.sendMessage({cmd:'setIcon', active})` 切 action icon。
 
 為何三層必要:
 - **popup**:存得到 `chrome.storage`,送得到 `chrome.tabs.sendMessage`,但不在 page 裡
-- **content.js**(isolated world):跟 popup 通訊用 `chrome.runtime`,但看不到 page 的 `System` / `THREE`
-- **injected.js**(MAIN world):看得到 page globals,但用不到 `chrome.*`
-- **background.js**:`chrome.action.setIcon` 在 service worker 比較穩,且 popup 關閉時也能由 content.js 觸發(例如自動 apply 完)
+- **content script**(isolated world):跟 popup 通訊用 webext-bridge,但看不到 page 的 `System` / `THREE`
+- **injected script**(MAIN world):看得到 page globals,但用不到 `chrome.*`
+- **background**:`chrome.action.setIcon` 在 service worker 比較穩,且 popup 關閉時也能由 content script 觸發(例如自動 apply 完)
 
 ### 指令協定
 
-`content.js ↔ injected.js`:`window.postMessage` 每筆帶 `id` / 3 秒 timeout。
+content script ↔ injected script:`window.postMessage` 每筆帶 `id` / 3 秒 timeout。
 - `apply(opts)` — 套用設定;`opts = { enabled, showNeutral, showIndicators, enabledCrateTypes, fontSize, hiddenUnits }`
 - `status` — 回報目前狀態
 - `getUnitNames` — 列出所有單位 ruleName + displayName
 
-content.js 收到 injected.js 發出的 `{__ra2names:'ready'}` 後,**自動 apply** 已儲存的設定(若任一功能為 on),並通知 background 切 icon。
+content script 收到 injected script 發出的 `{__ra2names:'ready'}` 後,**自動 apply** 已儲存的設定(若任一功能為 on),並通知 background 切 icon。
 
 ### popup UI
 

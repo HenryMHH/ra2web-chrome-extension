@@ -10,3 +10,5 @@ declare module '*.vue' {
 declare const System: {
   import: <T = any>(moduleName: string) => Promise<T>
 }
+
+declare const THREE: any
