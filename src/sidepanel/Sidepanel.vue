@@ -5,6 +5,7 @@ import AppHeader from '~/sidepanel/components/AppHeader.vue'
 import ApplyBar from '~/sidepanel/components/ApplyBar.vue'
 import SettingsSection from '~/sidepanel/components/SettingsSection.vue'
 import CrateSection from '~/sidepanel/components/CrateSection.vue'
+import FilterSection from '~/sidepanel/components/FilterSection.vue'
 import StatusBar from '~/popup/components/StatusBar.vue'
 import ActiveFilterInfo from '~/popup/components/ActiveFilterInfo.vue'
 import type { AppliedFilter } from '~/popup/components/ActiveFilterInfo.vue'
@@ -72,6 +73,8 @@ async function apply() {
   const r = await bridge.apply({
     enabled: settings.value.enabled,
     showNeutral: settings.value.showNeutral,
+    showAlly: settings.value.showAlly,
+    showEnemy: settings.value.showEnemy,
     showIndicators: settings.value.showIndicators,
     enabledCrateTypes: settings.value.enabledCrateTypes,
     fontSize: settings.value.fontSize,
@@ -116,7 +119,12 @@ async function apply() {
           v-model:font-size="settings.fontSize"
         />
         <CrateSection v-model="settings.enabledCrateTypes" />
-        <!-- placeholder: FilterSection (Task 8) -->
+        <FilterSection
+          v-model:shownUnitsCustom="settings.shownUnitsCustom"
+          v-model:filterMode="settings.filterMode"
+          v-model:selectedPresetIndex="settings.selectedPresetIndex"
+          v-model:totalCount="totalCount"
+        />
       </div>
       <ApplyBar hint="變更會在 ra2web 分頁開啟時生效" @apply="apply" />
     </div>
