@@ -1,12 +1,10 @@
-<script lang="ts">
-// Module-level singleton. In production there is only ever one
-// popup/sidepanel instance of UnitFilter; this ensures only the
-// most-recently-mounted instance reacts to visibility events even if
-// stale instances are still in the DOM (e.g. across test cases).
-</script>
-
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import {
+  ensureVisibilityListener,
+  isCurrentVisibilityHandler,
+  setVisibilityHandler,
+} from './unitFilterVisibility'
 import { useRa2Bridge } from '~/popup/composables/useRa2Bridge'
 import { useRa2Snapshots } from '~/popup/composables/useRa2Snapshots'
 
@@ -20,17 +18,6 @@ const emit = defineEmits<{
   (e: 'update:filterMode', v: 'custom' | 'preset'): void
   (e: 'update:selectedPresetIndex', v: number): void
 }>()
-let __currentVisibilityHandler: (() => void) | null = null
-let __visibilityListenerInstalled = false
-function __ensureVisibilityListener() {
-  if (__visibilityListenerInstalled)
-    return
-  __visibilityListenerInstalled = true
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible' && __currentVisibilityHandler)
-      __currentVisibilityHandler()
-  })
-}
 
 const bridge = useRa2Bridge()
 const { snapshots, load: loadSnapshots, add: addSnapshot, remove: removeSnapshot } = useRa2Snapshots()
@@ -67,12 +54,12 @@ function onDetailsToggle() {
 
 onMounted(() => {
   fetchUnits()
-  __currentVisibilityHandler = fetchUnits
-  __ensureVisibilityListener()
+  setVisibilityHandler(fetchUnits)
+  ensureVisibilityListener()
 })
 onBeforeUnmount(() => {
-  if (__currentVisibilityHandler === fetchUnits)
-    __currentVisibilityHandler = null
+  if (isCurrentVisibilityHandler(fetchUnits))
+    setVisibilityHandler(null)
 })
 
 const hidden = computed(() => new Set(props.hiddenUnitsCustom))
