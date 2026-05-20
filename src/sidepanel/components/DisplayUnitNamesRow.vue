@@ -52,7 +52,7 @@ function emitFaction(f: 'ally' | 'enemy' | 'neutral', v: boolean) {
           @update:model-value="emitFaction(f, $event)"
         />
         <span class="text-sm text-secondary-foreground">
-          {{ f === 'ally' ? 'Ally' : f === 'enemy' ? 'Enemy' : 'Neutral' }}
+          {{ f === 'ally' ? '盟友' : f === 'enemy' ? '敵方' : '中立' }}
         </span>
       </label>
     </div>

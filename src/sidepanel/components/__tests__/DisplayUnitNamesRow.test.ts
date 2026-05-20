@@ -12,9 +12,9 @@ describe('displayUnitNamesRow', () => {
         neutral: false,
       },
     })
-    expect(w.text()).toContain('Ally')
-    expect(w.text()).toContain('Enemy')
-    expect(w.text()).toContain('Neutral')
+    expect(w.text()).toContain('盟友')
+    expect(w.text()).toContain('敵方')
+    expect(w.text()).toContain('中立')
   })
 
   it('emits update:modelValue when main toggle clicked', async () => {
