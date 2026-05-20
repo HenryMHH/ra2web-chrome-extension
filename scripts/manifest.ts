@@ -9,8 +9,8 @@ export async function writeManifest() {
   await fs.ensureDir(r('extension/assets'))
   for (const size of ICON_SIZES) {
     await fs.copy(
-      r(`src/assets/icon-${size}.png`),
-      r(`extension/assets/icon-${size}.png`),
+      r(`src/assets/stopping-${size}.png`),
+      r(`extension/assets/stopping-${size}.png`),
     )
   }
   log('PRE', 'write manifest.json + copy icons')
