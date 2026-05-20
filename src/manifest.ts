@@ -23,6 +23,18 @@ export async function getManifest() {
     description: pkg.description,
     action: {
       default_title: pkg.displayName || pkg.name,
+      default_icon: {
+        16: 'assets/icon-16.png',
+        32: 'assets/icon-32.png',
+        48: 'assets/icon-48.png',
+        128: 'assets/icon-128.png',
+      },
+    },
+    icons: {
+      16: 'assets/icon-16.png',
+      32: 'assets/icon-32.png',
+      48: 'assets/icon-48.png',
+      128: 'assets/icon-128.png',
     },
     options_ui: {
       page: 'dist/options/index.html',
