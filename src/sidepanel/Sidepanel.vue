@@ -26,6 +26,8 @@ const status = ref<{ kind: 'idle' | 'ok' | 'active' | 'error', text: string }>({
 })
 const totalCount = ref(0)
 const lastApplied = ref<AppliedFilter | null>(null)
+const applySuccess = ref(false)
+const APPLY_SUCCESS_MS = 1600
 
 const draftFilter = ref<{
   shownUnitsCustom: ShownUnits
@@ -142,8 +144,12 @@ async function sendApply(opts: { source: 'instant' | 'filter' }) {
       total: snap ? snap.totalCount : totalCount.value,
       snapshotName: snap?.name,
     }
-    if (opts.source === 'filter')
-      toast.show('ok', settings.value.enabled ? '已套用篩選' : '已停用')
+    if (opts.source === 'filter') {
+      applySuccess.value = true
+      setTimeout(() => {
+        applySuccess.value = false
+      }, APPLY_SUCCESS_MS)
+    }
   }
   else {
     status.value = { kind: 'error', text: `失敗：${r.error ?? 'unknown'}` }
@@ -206,7 +212,7 @@ watch(
       </div>
       <ApplyBar
         :disabled="!filterDirty"
-        :hint="filterDirty ? '單位篩選有未套用變更' : '其他設定即時生效；僅單位篩選需要套用'"
+        :success="applySuccess"
         label="套用單位篩選"
         @apply="applyFilter"
       />
