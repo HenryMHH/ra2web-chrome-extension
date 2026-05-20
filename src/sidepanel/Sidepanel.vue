@@ -1,10 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watchEffect } from 'vue'
-import MainToggleRow from '~/popup/components/MainToggleRow.vue'
-import FontSizeRow from '~/popup/components/FontSizeRow.vue'
-import IndicatorsRow from '~/popup/components/IndicatorsRow.vue'
-import CrateGrid from '~/popup/components/CrateGrid.vue'
-import UnitFilter from '~/popup/components/UnitFilter.vue'
+import AppHeader from '~/sidepanel/components/AppHeader.vue'
+import ApplyBar from '~/sidepanel/components/ApplyBar.vue'
 import StatusBar from '~/popup/components/StatusBar.vue'
 import ActiveFilterInfo from '~/popup/components/ActiveFilterInfo.vue'
 import type { AppliedFilter } from '~/popup/components/ActiveFilterInfo.vue'
@@ -13,6 +10,8 @@ import { useRa2Settings } from '~/popup/composables/useRa2Settings'
 import { useRa2Snapshots } from '~/popup/composables/useRa2Snapshots'
 import { useRa2Bridge } from '~/popup/composables/useRa2Bridge'
 import { useToast } from '~/popup/composables/useToast'
+
+const VERSION = '0.0.1'
 
 const { settings, ready, load, save } = useRa2Settings()
 const { snapshots, load: loadSnapshots } = useRa2Snapshots()
@@ -101,32 +100,18 @@ async function apply() {
 </script>
 
 <template>
-  <main class="sidepanel">
-    <StatusBar :kind="status.kind" :text="status.text" />
-    <ActiveFilterInfo :applied="lastApplied" />
+  <main class="bg-background min-h-screen">
+    <div class="w-[360px] mx-auto bg-card rounded-none sm:rounded-2xl border border-border overflow-hidden">
+      <AppHeader :active="status.kind === 'active'" :version="VERSION" />
+      <div class="max-h-[520px] overflow-y-auto">
+        <StatusBar :kind="status.kind" :text="status.text" />
+        <ActiveFilterInfo :applied="lastApplied" />
+        <!-- placeholder: SettingsSection (Task 6) -->
+        <!-- placeholder: CrateSection (Task 7) -->
+        <!-- placeholder: FilterSection (Task 8) -->
+      </div>
+      <ApplyBar hint="變更會在 ra2web 分頁開啟時生效" @apply="apply" />
+    </div>
     <Toast />
-
-    <MainToggleRow
-      v-model="settings.enabled"
-      v-model:neutral="settings.showNeutral"
-    />
-    <FontSizeRow v-model="settings.fontSize" :disabled="!settings.enabled" />
-    <IndicatorsRow v-model="settings.showIndicators" />
-    <CrateGrid v-model="settings.enabledCrateTypes" />
-    <UnitFilter
-      v-model:shownUnitsCustom="settings.shownUnitsCustom"
-      v-model:filterMode="settings.filterMode"
-      v-model:selectedPresetIndex="settings.selectedPresetIndex"
-      v-model:totalCount="totalCount"
-    />
-
-    <button class="apply" type="button" @click="apply">
-      套用
-    </button>
   </main>
 </template>
-
-<style scoped>
-.sidepanel { padding: 12px; font-family: system-ui, -apple-system, sans-serif; }
-.apply { width: 100%; padding: 8px; margin-top: 12px; }
-</style>
