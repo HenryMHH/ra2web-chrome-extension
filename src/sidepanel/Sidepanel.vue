@@ -4,6 +4,7 @@ import { version as VERSION } from '../../package.json'
 import AppHeader from '~/sidepanel/components/AppHeader.vue'
 import ApplyBar from '~/sidepanel/components/ApplyBar.vue'
 import SettingsSection from '~/sidepanel/components/SettingsSection.vue'
+import CrateSection from '~/sidepanel/components/CrateSection.vue'
 import StatusBar from '~/popup/components/StatusBar.vue'
 import ActiveFilterInfo from '~/popup/components/ActiveFilterInfo.vue'
 import type { AppliedFilter } from '~/popup/components/ActiveFilterInfo.vue'
@@ -114,7 +115,7 @@ async function apply() {
           v-model:show-indicators="settings.showIndicators"
           v-model:font-size="settings.fontSize"
         />
-        <!-- placeholder: CrateSection (Task 7) -->
+        <CrateSection v-model="settings.enabledCrateTypes" />
         <!-- placeholder: FilterSection (Task 8) -->
       </div>
       <ApplyBar hint="變更會在 ra2web 分頁開啟時生效" @apply="apply" />
