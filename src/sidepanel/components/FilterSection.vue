@@ -3,9 +3,9 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import AppCheckbox from '~/components/ui/AppCheckbox.vue'
 import AppCollapsible from '~/components/ui/AppCollapsible.vue'
 import AppTabs from '~/components/ui/AppTabs.vue'
-import { useRa2Bridge } from '~/popup/composables/useRa2Bridge'
-import { useRa2Snapshots } from '~/popup/composables/useRa2Snapshots'
-import type { ShownUnits } from '~/popup/composables/useRa2Settings'
+import { useRa2Bridge } from '~/composables/useRa2Bridge'
+import { useRa2Snapshots } from '~/composables/useRa2Snapshots'
+import type { ShownUnits } from '~/composables/useRa2Settings'
 
 const props = defineProps<{
   shownUnitsCustom: ShownUnits

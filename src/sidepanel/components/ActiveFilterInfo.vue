@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { ShownUnits } from '~/popup/composables/useRa2Settings'
+import type { ShownUnits } from '~/composables/useRa2Settings'
 
 export interface AppliedFilter {
   mode: 'custom' | 'preset'

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useToast } from '~/popup/composables/useToast'
+import { useToast } from '~/composables/useToast'
 
 const { msg } = useToast()
 </script>

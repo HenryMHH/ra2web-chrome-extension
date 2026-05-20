@@ -2,12 +2,12 @@ import { mount } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
 import FilterSection from '../FilterSection.vue'
 
-vi.mock('~/popup/composables/useRa2Bridge', () => ({
+vi.mock('~/composables/useRa2Bridge', () => ({
   useRa2Bridge: () => ({
     getUnitNames: vi.fn().mockResolvedValue({ units: [['E1', 'GI'], ['DOG', 'Attack Dog']], source: 'test' }),
   }),
 }))
-vi.mock('~/popup/composables/useRa2Snapshots', () => ({
+vi.mock('~/composables/useRa2Snapshots', () => ({
   useRa2Snapshots: () => ({
     snapshots: { value: [] },
     load: vi.fn(),

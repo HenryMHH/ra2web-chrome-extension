@@ -45,7 +45,7 @@ const browserMock = {
 
 ;(globalThis as any).browser = browserMock
 
-vi.mock('~/popup/composables/useRa2Bridge', () => ({
+vi.mock('~/composables/useRa2Bridge', () => ({
   useRa2Bridge: () => ({
     apply: vi.fn().mockResolvedValue({ ok: true }),
     status: vi.fn().mockResolvedValue({ injected: true, enabled: false }),
@@ -65,13 +65,13 @@ describe('sidepanel persistence', () => {
     const Sidepanel = (await import('../Sidepanel.vue')).default
 
     // First mount: seed storage with a snapshot via composable directly
-    const { useRa2Snapshots } = await import('~/popup/composables/useRa2Snapshots')
+    const { useRa2Snapshots } = await import('~/composables/useRa2Snapshots')
     const s = useRa2Snapshots()
     await s.load()
     await s.add({ name: 'snap1', shownUnits: ['E1'], totalCount: 2 })
 
     // Also seed settings to filterMode=preset, selectedPresetIndex=0
-    const { useRa2Settings } = await import('~/popup/composables/useRa2Settings')
+    const { useRa2Settings } = await import('~/composables/useRa2Settings')
     const a = useRa2Settings()
     await a.load()
     a.settings.value.filterMode = 'preset'

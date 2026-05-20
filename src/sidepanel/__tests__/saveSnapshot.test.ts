@@ -51,7 +51,7 @@ const onChangedListeners: Array<(c: any, a: string) => void> = []
   },
 }
 
-vi.mock('~/popup/composables/useRa2Bridge', () => ({
+vi.mock('~/composables/useRa2Bridge', () => ({
   useRa2Bridge: () => ({
     apply: vi.fn().mockResolvedValue({ ok: true }),
     status: vi.fn().mockResolvedValue({ injected: true, enabled: false }),
