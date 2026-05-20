@@ -17,7 +17,12 @@ const emit = defineEmits<{
 }>()
 
 const bridge = useRa2Bridge()
-const { snapshots, load: loadSnapshots, add: addSnapshot, remove: removeSnapshot } = useRa2Snapshots()
+const {
+  snapshots,
+  load: loadSnapshots,
+  add: addSnapshot,
+  remove: removeSnapshot,
+} = useRa2Snapshots()
 const allUnits = ref<Array<[string, string]>>([])
 const query = ref('')
 const snapshotName = ref('')
@@ -84,7 +89,9 @@ const filtered = computed(() => {
   const q = query.value.trim().toLowerCase()
   if (!q)
     return allUnits.value
-  return allUnits.value.filter(([k, v]) => k.toLowerCase().includes(q) || v.toLowerCase().includes(q))
+  return allUnits.value.filter(
+    ([k, v]) => k.toLowerCase().includes(q) || v.toLowerCase().includes(q),
+  )
 })
 
 function emitShown(next: ShownUnits) {
@@ -122,7 +129,8 @@ async function saveSnapshot() {
   const name = `${snapshotName.value || '未命名'} ${new Date().toISOString()}`
   await addSnapshot({
     name,
-    shownUnits: props.shownUnitsCustom === 'all' ? 'all' : [...props.shownUnitsCustom],
+    shownUnits:
+      props.shownUnitsCustom === 'all' ? 'all' : [...props.shownUnitsCustom],
     totalCount: allUnits.value.length,
   })
   snapshotName.value = ''
@@ -150,12 +158,12 @@ async function deleteSelectedPreset() {
         :disabled="fetching"
         @click="fetchUnits"
       >
-        {{ fetching ? '抓取中…' : '重新整理' }}
+        {{ fetching ? "抓取中…" : "重新整理" }}
       </button>
     </div>
 
     <p class="hint">
-      ✅ 勾起來 = 顯示這個單位的名稱
+      ✅ = 顯示
     </p>
 
     <p data-testid="filter-count-label" class="count">
@@ -172,22 +180,32 @@ async function deleteSelectedPreset() {
           type="radio"
           :checked="filterMode === 'custom'"
           @change="$emit('update:filterMode', 'custom')"
-        > 自訂
+        >
+        自訂
       </label>
       <label>
         <input
           type="radio"
           :checked="filterMode === 'preset'"
           @change="$emit('update:filterMode', 'preset')"
-        > 快照
+        >
+        快照
       </label>
     </div>
 
     <div v-if="filterMode === 'custom'" class="custom">
       <input v-model="query" placeholder="搜尋…">
       <div class="list">
-        <label v-for="[ruleName, displayName] in filtered" :key="ruleName" class="item">
-          <input type="checkbox" :checked="isChecked(ruleName)" @change="toggle(ruleName)">
+        <label
+          v-for="[ruleName, displayName] in filtered"
+          :key="ruleName"
+          class="item"
+        >
+          <input
+            type="checkbox"
+            :checked="isChecked(ruleName)"
+            @change="toggle(ruleName)"
+          >
           <span class="rn">{{ displayName }}</span>
           <span class="key">{{ ruleName }}</span>
         </label>
@@ -211,16 +229,27 @@ async function deleteSelectedPreset() {
     <div v-else class="preset">
       <select
         :value="selectedPresetIndex"
-        @change="$emit('update:selectedPresetIndex', Number(($event.target as HTMLSelectElement).value))"
+        @change="
+          $emit(
+            'update:selectedPresetIndex',
+            Number(($event.target as HTMLSelectElement).value),
+          )
+        "
       >
         <option :value="-1">
           — 選擇快照 —
         </option>
         <option v-for="(s, i) in snapshots" :key="i" :value="i">
-          {{ s.name }}（{{ Array.isArray(s.shownUnits) ? s.shownUnits.length : '全部' }}/{{ s.totalCount }}）
+          {{ s.name }}（{{
+            Array.isArray(s.shownUnits) ? s.shownUnits.length : "全部"
+          }}/{{ s.totalCount }}）
         </option>
       </select>
-      <button type="button" :disabled="selectedPresetIndex < 0" @click="deleteSelectedPreset">
+      <button
+        type="button"
+        :disabled="selectedPresetIndex < 0"
+        @click="deleteSelectedPreset"
+      >
         刪除
       </button>
     </div>
@@ -228,15 +257,64 @@ async function deleteSelectedPreset() {
 </template>
 
 <style scoped>
-.head { display: flex; justify-content: space-between; align-items: center; margin: 6px 0; }
-.meta { font-size: 12px; color: #666; }
-.src { color: #888; font-family: monospace; }
-.hint { font-size: 11px; color: #555; background: #f6f6f6; padding: 4px 6px; border-radius: 3px; margin: 4px 0; }
-.count { font-size: 11px; color: #555; margin: 2px 0; }
-.empty { font-size: 12px; color: #b00; margin: 6px 0; }
-.modes { display: flex; gap: 8px; margin: 6px 0; }
-.list { max-height: 200px; overflow-y: auto; border: 1px solid #ddd; padding: 4px; }
-.item { display: flex; gap: 6px; align-items: center; font-size: 12px; }
-.key { color: #888; font-family: monospace; }
-.actions, .save, .preset { display: flex; gap: 6px; margin-top: 6px; }
+.head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 6px 0;
+}
+.meta {
+  font-size: 12px;
+  color: #666;
+}
+.src {
+  color: #888;
+  font-family: monospace;
+}
+.hint {
+  font-size: 11px;
+  color: #555;
+  background: #f6f6f6;
+  padding: 4px 6px;
+  border-radius: 3px;
+  margin: 4px 0;
+}
+.count {
+  font-size: 11px;
+  color: #555;
+  margin: 2px 0;
+}
+.empty {
+  font-size: 12px;
+  color: #b00;
+  margin: 6px 0;
+}
+.modes {
+  display: flex;
+  gap: 8px;
+  margin: 6px 0;
+}
+.list {
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid #ddd;
+  padding: 4px;
+}
+.item {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 12px;
+}
+.key {
+  color: #888;
+  font-family: monospace;
+}
+.actions,
+.save,
+.preset {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
 </style>
