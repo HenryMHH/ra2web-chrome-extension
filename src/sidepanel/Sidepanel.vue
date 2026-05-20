@@ -193,7 +193,6 @@ watch(
       <AppHeader :active="status.kind === 'active'" :version="VERSION" />
       <div class="overflow-y-auto">
         <StatusBar :kind="status.kind" :text="status.text" />
-        <ActiveFilterInfo :applied="lastApplied" />
         <SettingsSection
           v-model:enabled="settings.enabled"
           v-model:show-ally="settings.showAlly"
@@ -216,6 +215,7 @@ watch(
         label="套用單位篩選"
         @apply="applyFilter"
       />
+      <ActiveFilterInfo :applied="lastApplied" />
     </div>
     <Toast />
   </main>
