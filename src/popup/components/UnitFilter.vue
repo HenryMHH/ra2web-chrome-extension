@@ -13,6 +13,7 @@ const emit = defineEmits<{
   (e: 'update:shownUnitsCustom', v: ShownUnits): void
   (e: 'update:filterMode', v: 'custom' | 'preset'): void
   (e: 'update:selectedPresetIndex', v: number): void
+  (e: 'update:totalCount', v: number): void
 }>()
 
 const bridge = useRa2Bridge()
@@ -33,6 +34,7 @@ async function fetchUnits() {
     const r = await bridge.getUnitNames()
     const units = Array.isArray(r?.units) ? r.units : []
     allUnits.value = units.map(([k, v]) => [k, v])
+    emit('update:totalCount', allUnits.value.length)
     lastSource.value = r?.source ?? 'none'
   }
   catch (e) {
@@ -71,6 +73,12 @@ const explicitShown = computed<Set<string>>(() => {
 function isChecked(ruleName: string): boolean {
   return isShownAll.value || explicitShown.value.has(ruleName)
 }
+
+const checkedCount = computed<number>(() => {
+  if (props.shownUnitsCustom === 'all')
+    return allUnits.value.length
+  return props.shownUnitsCustom.length
+})
 
 const filtered = computed(() => {
   const q = query.value.trim().toLowerCase()
@@ -150,6 +158,10 @@ async function deleteSelectedPreset() {
       ✅ 勾起來 = 顯示這個單位的名稱
     </p>
 
+    <p data-testid="filter-count-label" class="count">
+      已勾選 {{ checkedCount }} / {{ allUnits.length }}
+    </p>
+
     <p v-if="allUnits.length === 0 && !fetching" class="empty">
       尚未抓到單位清單。請先進入對局，再按「重新整理」。
     </p>
@@ -220,6 +232,7 @@ async function deleteSelectedPreset() {
 .meta { font-size: 12px; color: #666; }
 .src { color: #888; font-family: monospace; }
 .hint { font-size: 11px; color: #555; background: #f6f6f6; padding: 4px 6px; border-radius: 3px; margin: 4px 0; }
+.count { font-size: 11px; color: #555; margin: 2px 0; }
 .empty { font-size: 12px; color: #b00; margin: 6px 0; }
 .modes { display: flex; gap: 8px; margin: 6px 0; }
 .list { max-height: 200px; overflow-y: auto; border: 1px solid #ddd; padding: 4px; }

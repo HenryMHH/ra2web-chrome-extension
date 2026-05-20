@@ -167,4 +167,28 @@ describe('unitFilter', () => {
     expect(() => mountFilter()).not.toThrow()
     await flushPromises()
   })
+
+  it('renders 已勾選 count using current shownUnits', async () => {
+    getUnitNames.mockReset()
+    getUnitNames.mockResolvedValue({
+      units: [['E1', '大兵'], ['DOG', '狗']],
+      source: 'rules',
+    })
+    const w = mountFilter(['DOG'])
+    await flushPromises()
+    expect(w.get('[data-testid="filter-count-label"]').text()).toBe('已勾選 1 / 2')
+  })
+
+  it('emits update:totalCount when units load', async () => {
+    getUnitNames.mockReset()
+    getUnitNames.mockResolvedValue({
+      units: [['E1', '大兵'], ['DOG', '狗'], ['MTNK', '犀牛']],
+      source: 'rules',
+    })
+    const w = mountFilter('all')
+    await flushPromises()
+    const emits = w.emitted('update:totalCount')
+    expect(emits).toBeTruthy()
+    expect(emits![emits!.length - 1][0]).toBe(3)
+  })
 })

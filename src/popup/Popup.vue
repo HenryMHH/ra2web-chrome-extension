@@ -6,17 +6,24 @@ import IndicatorsRow from './components/IndicatorsRow.vue'
 import CrateGrid from './components/CrateGrid.vue'
 import UnitFilter from './components/UnitFilter.vue'
 import StatusBar from './components/StatusBar.vue'
+import ActiveFilterInfo from './components/ActiveFilterInfo.vue'
+import type { AppliedFilter } from './components/ActiveFilterInfo.vue'
+import Toast from './components/Toast.vue'
 import { useRa2Settings } from './composables/useRa2Settings'
 import { useRa2Snapshots } from './composables/useRa2Snapshots'
 import { useRa2Bridge } from './composables/useRa2Bridge'
+import { useToast } from './composables/useToast'
 
 const { settings, ready, load, save } = useRa2Settings()
 const { snapshots, load: loadSnapshots } = useRa2Snapshots()
 const bridge = useRa2Bridge()
+const toast = useToast()
 const status = ref<{ kind: 'idle' | 'ok' | 'active' | 'error', text: string }>({
   kind: 'idle',
   text: '尚未連線',
 })
+const totalCount = ref(0)
+const lastApplied = ref<AppliedFilter | null>(null)
 
 async function init() {
   await Promise.all([load(), loadSnapshots()])
@@ -64,9 +71,20 @@ async function apply() {
     status.value = active
       ? { kind: 'active', text: '已套用 — 啟用中' }
       : { kind: 'ok', text: '已套用 — 未啟用' }
+    const snap = settings.value.filterMode === 'preset' && settings.value.selectedPresetIndex >= 0
+      ? snapshots.value[settings.value.selectedPresetIndex]
+      : undefined
+    lastApplied.value = {
+      mode: settings.value.filterMode,
+      shownUnits: effectiveShownUnits.value,
+      total: snap ? snap.totalCount : totalCount.value,
+      snapshotName: snap?.name,
+    }
+    toast.show('ok', settings.value.enabled ? '已套用' : '已停用')
   }
   else {
     status.value = { kind: 'error', text: `失敗：${r.error ?? 'unknown'}` }
+    toast.show('err', `套用失敗：${r.error ?? 'unknown'}`)
   }
 }
 </script>
@@ -74,6 +92,8 @@ async function apply() {
 <template>
   <main class="popup">
     <StatusBar :kind="status.kind" :text="status.text" />
+    <ActiveFilterInfo :applied="lastApplied" />
+    <Toast />
 
     <MainToggleRow
       v-model="settings.enabled"
@@ -86,6 +106,7 @@ async function apply() {
       v-model:shownUnitsCustom="settings.shownUnitsCustom"
       v-model:filterMode="settings.filterMode"
       v-model:selectedPresetIndex="settings.selectedPresetIndex"
+      v-model:totalCount="totalCount"
     />
 
     <button class="apply" type="button" @click="apply">
