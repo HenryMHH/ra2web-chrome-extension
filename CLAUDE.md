@@ -385,7 +385,7 @@ interface Ra2Settings {
 interface Snapshot { name: string; shownUnits: 'all' | string[]; totalCount: number }
 ```
 
-`useRa2Snapshots.ts:38-58` load 時過濾掉舊 shape(`hiddenUnits` 欄位)並 console.info 告知 dropped 數量,再覆寫 storage —— **單向遷移**,沒有相容回退。
+`useRa2Snapshots.ts:41-58` load 時過濾掉舊 shape(`hiddenUnits` 欄位)並 console.info 告知 dropped 數量,再覆寫 storage —— **單向遷移**,沒有相容回退。
 
 ---
 
@@ -596,8 +596,8 @@ host pattern apex (`ra2web.com`) 和子網域 (`*.ra2web.com`) 必須分開列 �
 8. **buildLabel 失敗的暫時性錯誤(`strings` 還沒就緒)** — `refreshLabel` 若 `buildLabel` 回 null 不更新 cache,下一幀自動重試
 9. **CrateGeneratorTrait ref 取得時機** — 若使用者在開局後才啟用「寶箱內容」,`init` 已跑過,改在 `spawnCrateAt` 補捕一次 trait ref;換局時 `init` 會清空 `discoveredUnits`
 10. **canvas 自動放大會清空原本像素** — `CanvasUtils.drawText` 的 `autoEnlargeCanvas: true` 會在文字超出時擴大畫布並清空。先 `getImageData` 備份再 `putImageData(imgData, 1, 1)` shift 1px 還原(順便當作描邊預留空間)
-11. **showCrateContents 從 boolean 演進到 enabledCrateTypes 陣列** — popup `loadSettings` 仍處理舊 key migration,把舊的全 on boolean 視為「全部 powerup type 勾選」
-12. **filter 兩種模式儲存設計** — `hiddenUnits` 是執行期最終結果;`hiddenUnitsCustom` 是 custom 模式編輯狀態;`snapshots` 是 preset 來源。三者不要混淆
+11. **showCrateContents 從 boolean 演進到 enabledCrateTypes 陣列** — `useRa2Settings.normalizeSettings` 仍處理舊 key migration,把舊的全 on boolean 視為「全部 powerup type 勾選」
+12. **filter 三層儲存(白名單版)** — `settings.shownUnits`(injected runtime,`'all' | Set<string>`)是執行期最終結果;`shownUnitsCustom`(sidepanel storage,`'all' | string[]`)是 custom 模式編輯狀態;`snapshots[i].shownUnits` 是 preset 來源。`appliedShownUnits` computed 在 sidepanel 端依 `filterMode` 選 custom 或 preset 後送進 `apply()`。三者型別不同(Set vs. array vs. 字面 `'all'`),改 schema 時三處要一起動。
 13. **單位篩選清單與 `rules.name` key 字典不一致** — 早期版本用 `strings.data` 的 `name:*` keys 列清單,但實際隱藏比對 `gameObject.rules.name`。當多個 rule 共享同一 `uiName`(例如 ADOG / SDOG 共享 `name:DOG`),清單只看得到 `DOG`,勾選後 `hiddenUnits.has('ADOG')` 仍回 false → 標籤不消失。改以 `state.gameRef.rules` 之 `{infantry,vehicle,aircraft,building}Rules` Map 為主要來源,key 與比對端同字典。
 14. **drawOverlay 用的 camera matrixWorldInverse 在 render() 外不會自動更新** — Three.js 只在 `WebGLRenderer.render()` 內部更新 camera.matrixWorldInverse。如果我們的 RAF 比遊戲的 render call 先跑,projection 會用上一幀的矩陣,結果寶箱標籤每幀都落後相機一格,看起來像「跟著螢幕飄」。在 drawOverlay 內手動 `camera.updateMatrixWorld()` 後反矩陣再投影即可解決。畫面外指標因為會 clamp 到邊緣所以看不出來,但寶箱這種精準定位就會露餡。
 15. **`Matrix4.invert()` 在 r94 不存在** — 接續坑 #14,反矩陣寫法要 feature-detect:
@@ -623,6 +623,6 @@ host pattern apex (`ra2web.com`) 和子網域 (`*.ra2web.com`) 必須分開列 �
 - 標籤透明度 / 邊框寬度客製化
 - 顯示額外資訊(HP%、距離、coords 等)
 - 寶箱標籤過期時間或 fade-out 動畫
-- 多語系(目前 popup 字串硬編 zh-Hant)
+- 多語系(目前 sidepanel 字串硬編 zh-Hant)
 - 匯入/匯出 snapshots(JSON 檔)
 - 篩選依「類型」(infantry / vehicle / building / aircraft)而非個別 ruleName
