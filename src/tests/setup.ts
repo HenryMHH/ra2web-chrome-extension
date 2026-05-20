@@ -7,6 +7,5 @@ if (typeof globalThis.ResizeObserver === 'undefined') {
     unobserve() {}
     disconnect() {}
   }
-  // @ts-expect-error - assigning polyfill onto globalThis
-  globalThis.ResizeObserver = ResizeObserverPolyfill
+  globalThis.ResizeObserver = ResizeObserverPolyfill as unknown as typeof ResizeObserver
 }
