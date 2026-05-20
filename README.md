@@ -1,4 +1,4 @@
-# RA2 Web 輔助小工具
+# RA2 Web 輔助小工具 [[CN](https://github.com/HenryMHH/ra2web-chrome-extension/blob/main/README-CN.md)] [[EN](https://github.com/HenryMHH/ra2web-chrome-extension/blob/main/README-EN.md)]
 
 紅色警戒 2 網頁版的 Chrome 擴充套件,讓你打 Chrono Divide / ra2web 的時候看得更清楚、玩得更輕鬆。
 
