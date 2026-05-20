@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import { ref } from 'vue'
 import UnitFilter from '../UnitFilter.vue'
@@ -18,17 +18,23 @@ vi.mock('~/popup/composables/useRa2Snapshots', () => ({
   }),
 }))
 
-function mountFilter() {
-  return mount(UnitFilter, {
-    props: {
-      hiddenUnitsCustom: [],
-      filterMode: 'custom' as const,
-      selectedPresetIndex: -1,
-    },
-  })
-}
-
 describe('unitFilter', () => {
+  const wrappers: any[] = []
+  afterEach(() => {
+    while (wrappers.length) wrappers.pop()?.unmount()
+  })
+  function mountFilter() {
+    const w = mount(UnitFilter, {
+      props: {
+        hiddenUnitsCustom: [],
+        filterMode: 'custom' as const,
+        selectedPresetIndex: -1,
+      },
+    })
+    wrappers.push(w)
+    return w
+  }
+
   it('fetches units on mount', async () => {
     getUnitNames.mockReset()
     getUnitNames.mockResolvedValue({ units: [['E1', '大兵']], source: 'rules' })
@@ -66,7 +72,30 @@ describe('unitFilter', () => {
     const w = mountFilter()
     await flushPromises()
     expect(getUnitNames).toHaveBeenCalledTimes(1)
-    await w.get('details').trigger('toggle')
+    // jsdom fires `toggle` natively (asynchronously, via macrotask) when
+    // `details.open` changes — wait one macrotask after the assignment.
+    const details = w.get('details').element as HTMLDetailsElement
+    details.open = true
+    await new Promise(r => setTimeout(r, 0))
+    await flushPromises()
+    expect(getUnitNames).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not refetch when <details> closes', async () => {
+    getUnitNames.mockReset()
+    getUnitNames.mockResolvedValue({ units: [], source: 'none' })
+    const w = mountFilter()
+    // ensure mount-fetch resolves before we open
+    await flushPromises()
+    // first open the details (this triggers a refetch — expected)
+    const details = w.get('details').element as HTMLDetailsElement
+    details.open = true
+    await new Promise(r => setTimeout(r, 0))
+    await flushPromises()
+    expect(getUnitNames).toHaveBeenCalledTimes(2)
+    // now close it — should NOT refetch
+    details.open = false
+    await new Promise(r => setTimeout(r, 0))
     await flushPromises()
     expect(getUnitNames).toHaveBeenCalledTimes(2)
   })

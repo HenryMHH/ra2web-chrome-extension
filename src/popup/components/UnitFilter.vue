@@ -1,10 +1,5 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import {
-  ensureVisibilityListener,
-  isCurrentVisibilityHandler,
-  setVisibilityHandler,
-} from './unitFilterVisibility'
 import { useRa2Bridge } from '~/popup/composables/useRa2Bridge'
 import { useRa2Snapshots } from '~/popup/composables/useRa2Snapshots'
 
@@ -48,18 +43,21 @@ async function fetchUnits() {
   }
 }
 
-function onDetailsToggle() {
-  fetchUnits()
+function onVisibility() {
+  if (document.visibilityState === 'visible')
+    fetchUnits()
+}
+function onDetailsToggle(e: Event) {
+  if ((e.target as HTMLDetailsElement).open)
+    fetchUnits()
 }
 
 onMounted(() => {
   fetchUnits()
-  setVisibilityHandler(fetchUnits)
-  ensureVisibilityListener()
+  document.addEventListener('visibilitychange', onVisibility)
 })
 onBeforeUnmount(() => {
-  if (isCurrentVisibilityHandler(fetchUnits))
-    setVisibilityHandler(null)
+  document.removeEventListener('visibilitychange', onVisibility)
 })
 
 const hidden = computed(() => new Set(props.hiddenUnitsCustom))
