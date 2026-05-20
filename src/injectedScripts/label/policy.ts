@@ -8,6 +8,10 @@ export function shouldShowLabel(self: PipOverlayLike): boolean {
   const team = resolveTeam(self)
   if (team === 'neutral' && !settings.showNeutral)
     return false
+  if (team === 'ally' && !settings.showAlly)
+    return false
+  if (team === 'enemy' && !settings.showEnemy)
+    return false
   if (settings.shownUnits === 'all')
     return true
   const ruleName = self.gameObject?.rules?.name

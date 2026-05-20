@@ -7,6 +7,8 @@ export type ShownUnits = 'all' | string[]
 export interface ApplyOpts {
   enabled?: boolean
   showNeutral?: boolean
+  showAlly?: boolean
+  showEnemy?: boolean
   showIndicators?: boolean
   enabledCrateTypes?: number[]
   fontSize?: number
@@ -19,6 +21,8 @@ export interface ApplyResult {
   state?: {
     enabled: boolean
     showNeutral: boolean
+    showAlly: boolean
+    showEnemy: boolean
     showIndicators: boolean
     enabledCrateTypes: number[]
     fontSize: number

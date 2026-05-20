@@ -18,6 +18,8 @@ declare const System: any
 export async function apply(opts: ApplyOpts): Promise<ApplyResult> {
   settings.enabled = !!opts.enabled
   settings.showNeutral = !!opts.showNeutral
+  settings.showAlly = opts.showAlly !== false
+  settings.showEnemy = opts.showEnemy !== false
   settings.showIndicators = !!opts.showIndicators
   settings.enabledCrateTypes = new Set(
     Array.isArray(opts.enabledCrateTypes)
@@ -87,6 +89,8 @@ export async function apply(opts: ApplyOpts): Promise<ApplyResult> {
     state: {
       enabled: settings.enabled,
       showNeutral: settings.showNeutral,
+      showAlly: settings.showAlly,
+      showEnemy: settings.showEnemy,
       showIndicators: settings.showIndicators,
       enabledCrateTypes: [...settings.enabledCrateTypes],
       fontSize: settings.fontSize,
@@ -101,6 +105,8 @@ export function getStatus() {
     classesReady: !!(runtime.PipOverlay && runtime.CanvasUtils && runtime.SpriteUtils && runtime.Coords),
     enabled: settings.enabled,
     showNeutral: settings.showNeutral,
+    showAlly: settings.showAlly,
+    showEnemy: settings.showEnemy,
     showIndicators: settings.showIndicators,
     enabledCrateTypes: [...settings.enabledCrateTypes],
     fontSize: settings.fontSize,

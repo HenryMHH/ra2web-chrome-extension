@@ -18,6 +18,8 @@ export function drawIndicators(
 ): void {
   if (!runtime.alliances || !runtime.viewer)
     return
+  if (!settings.showEnemy)
+    return
   const local = runtime.viewer.value
   const players = runtime.alliances.playerList?.players
   if (!players)
