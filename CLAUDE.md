@@ -610,6 +610,11 @@ host pattern apex (`ra2web.com`) 和子網域 (`*.ra2web.com`) 必須分開列 �
     ```
     遊戲打包的是 r94,只能走 `getInverse`。直接寫 `.copy(m).invert()` 會炸 `TypeError: ...invert is not a function`。寫 THREE API 前先對版本表(見上方執行期依賴)。
 
+16. **黑名單 → 白名單遷移無法無損** — 從 `hiddenUnits` 反推 `shownUnits` 需要「當時的完整單位清單」,但 sidepanel 載入時拿不到當局 rules(injected 還沒 ready)。所以 `useRa2Settings.normalizeSettings` 直接把舊 key 丟掉,重設為 `shownUnitsCustom: 'all'`,並印一條 `console.info` 告知使用者「showing all」。`useRa2Snapshots` 同樣丟棄舊 shape 快照(沒有 `shownUnits` 欄位的)並覆寫 storage —— 單向遷移,沒有 fallback。
+17. **draft/commit 模型 vs. instant apply 不對稱** — 篩選有 `ApplyBar` 按鈕(draft),但開關 / 字級 / 寶箱 type 走 instant watcher。原因:篩選變更牽涉清單重編 + label sweep 成本較高,使用者可能連續勾選十幾筆;開關類則希望即時看到效果。共用 `sendApply` 但分 `source: 'instant' | 'filter'` 標記 —— filter 路徑成功後會觸發 `CheckAnimation`(`Sidepanel.vue:147-152`),instant 路徑不會。
+18. **`shownUnits` 同名但兩端不同型別** — sidepanel 持久化的是 `shownUnitsCustom: 'all' | string[]`(JSON 友善),injected 執行期持有的是 `settings.shownUnits: 'all' | Set<string>`(查詢 O(1))。轉換在 `bridge/commands.ts:29-37`(injected 收)和 `Sidepanel.vue` `appliedShownUnits` computed(sidepanel 送)兩處發生 —— 改 schema 時兩邊都要動,且 content script 的 auto-apply 路徑會做 `shownUnits: s.shownUnitsCustom ?? 'all'` 的 alias(`contentScripts/index.ts:31`),也要一起改。
+19. **per-faction toggle 預設 `true`** — 新增 `showAlly` / `showEnemy` 時,預設值若用 `false` 會讓既有使用者升級後突然看不到大半 label。`normalizeSettings` 用 `raw.showAlly !== false`(預設 true,只有顯式 false 才關)和 settings.ts 的初始值 `true` 共同保證 forward-compat。
+
 ---
 
 ## 九、可擴充方向
