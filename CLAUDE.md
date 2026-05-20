@@ -264,12 +264,17 @@ function resolveTeam(self) {
 ### `shouldShowLabel(self)` 判斷
 
 ```
-state.enabled 必須開
-team === 'neutral' 時 state.showNeutral 必須開
-gameObject.rules.name 必須不在 state.hiddenUnits 中(大寫比對)
+settings.enabled 必須開
+team === 'neutral' 時 settings.showNeutral 必須開
+team === 'ally'    時 settings.showAlly    必須開
+team === 'enemy'   時 settings.showEnemy   必須開
+settings.shownUnits === 'all'  → 通過
+否則 gameObject.rules.name(大寫)必須在 settings.shownUnits 中
 ```
 
 `update()` patch 每幀檢查;不符就 detach,符合就 attach 或 refresh。
+
+**`'self'` 永遠通過**(不會落到 ally/enemy/neutral 分支),預設 `showAlly` / `showEnemy` 皆 `true`,所以行為與舊版「主開關開 + 中立可選」相容,只是多了 ally / enemy 兩個獨立開關。
 
 ### 既存單位的處理 — `pipInstances` 集合
 
