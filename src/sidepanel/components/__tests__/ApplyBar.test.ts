@@ -35,4 +35,16 @@ describe('applyBar', () => {
     const w = mount(ApplyBar, { props: { label: 'x', success: true } })
     expect(w.find('button').attributes('disabled')).toBeDefined()
   })
+
+  it('does not dim the button when success=true', () => {
+    const w = mount(ApplyBar, { props: { label: 'x', success: true } })
+    const cls = w.find('button').classes()
+    expect(cls).not.toContain('opacity-50')
+  })
+
+  it('dims the button when disabled=true and success=false', () => {
+    const w = mount(ApplyBar, { props: { label: 'x', disabled: true } })
+    const cls = w.find('button').classes()
+    expect(cls).toContain('opacity-50')
+  })
 })
