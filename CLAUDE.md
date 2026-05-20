@@ -391,147 +391,143 @@ interface Snapshot { name: string; shownUnits: 'all' | string[]; totalCount: num
 
 ## 六、Chrome Extension 結構
 
-### 檔案（vitesse-webext 架構）
+### 檔案(vitesse-webext + Vite 多入口)
 
 ```
 src/
-├── manifest.ts                # 動態產生 manifest.json
-├── background/main.ts         # service worker（icon 切換 + setIcon listener）
+├── manifest.ts                      # 動態產 manifest.json;RA2_MATCHES 常數集中 host pattern
+├── background/
+│   ├── main.ts                      # service worker:setIcon listener + tab url 監聽
+│   └── contentScriptHMR.ts          # dev-only HMR injection
 ├── contentScripts/
-│   ├── index.ts               # isolated world：注入 + auto-apply + webext-bridge 中繼
-│   └── utils/
-│       ├── dom.ts             # injectScript helper
-│       └── pageBridge.ts      # pageCmd promise wrapper + onPageReady
+│   ├── index.ts                     # isolated world：注入 + auto-apply + webext-bridge 中繼
+│   ├── views/App.vue                # 內容腳本內掛載的 Vue 元件(若有用)
+│   └── utils/{dom,pageBridge}.ts    # injectScript + pageCmd promise wrapper
 ├── injectedScripts/
-│   ├── index.ts               # IIFE 入口
-│   ├── types.ts               # Team / ApplyOpts / LabelCache / PipOverlayLike
-│   ├── state/
-│   │   ├── settings.ts        # 使用者設定 store
-│   │   ├── runtime.ts         # SystemJS refs + 遊戲執行期物件
-│   │   ├── tracking.ts        # PipOverlay 集合 + labelCache WeakMap
-│   │   ├── overlay.ts         # overlay canvas / RAF / sweep promise
-│   │   └── log.ts             # TAG / log / warn
-│   ├── system/
-│   │   ├── loader.ts          # loadClasses + CrateGeneratorTrait patch
-│   │   └── three-compat.ts    # invertM4 (r94 vs r123+)
-│   ├── pip/
-│   │   ├── resolvers.ts       # resolveTeam / resolveName / resolveNameFromGo
-│   │   └── patch.ts           # PipOverlay.prototype hooks
-│   ├── label/
-│   │   ├── build.ts           # buildLabel → THREE.Mesh
-│   │   ├── policy.ts          # shouldShowLabel
-│   │   ├── lifecycle.ts       # attach / refresh / detach
-│   │   └── sweep.ts           # sweepLeftoverLabels (WebGLRenderer hook)
-│   ├── overlay/
-│   │   ├── canvas.ts          # init / remove
-│   │   ├── indicators.ts      # 畫面外箭頭
-│   │   ├── crates.ts          # 寶箱標籤
-│   │   └── draw.ts            # RAF orchestrator
-│   ├── rules/
-│   │   └── enumerate.ts       # enumerateRulesUnits / getUnitNames
-│   ├── bridge/
-│   │   ├── commands.ts        # apply / getStatus / handlers map
-│   │   └── messaging.ts       # window.postMessage 收發
-│   └── __tests__/             # vitest: resolvers / policy / three-compat / enumerate
-├── popup/
-│   ├── Popup.vue              # 組合元件 + composables
-│   ├── main.ts
-│   ├── index.html
-│   ├── composables/
-│   │   ├── useRa2Settings.ts
-│   │   ├── useRa2Snapshots.ts
-│   │   └── useRa2Bridge.ts
-│   └── components/
-│       ├── MainToggleRow.vue
-│       ├── FontSizeRow.vue
-│       ├── IndicatorsRow.vue
-│       ├── CrateGrid.vue
-│       ├── UnitFilter.vue
-│       └── StatusBar.vue
+│   ├── index.ts                     # IIFE 入口
+│   ├── types.ts                     # Team / ApplyOpts / LabelCache / PipOverlayLike
+│   ├── state/                       # settings / runtime / tracking / overlay / log
+│   ├── system/                      # loader (System.import + CrateGeneratorTrait patch) + three-compat
+│   ├── pip/                         # resolvers + PipOverlay.prototype patch
+│   ├── label/                       # build / policy / lifecycle / sweep
+│   ├── overlay/                     # canvas / indicators / crates / draw RAF
+│   ├── rules/enumerate.ts           # enumerateRulesUnits + getUnitNames
+│   ├── bridge/                      # commands(apply / status / getUnitNames) + window.postMessage
+│   └── __tests__/                   # vitest: resolvers / policy / policy.faction / three-compat / enumerate
+├── sidepanel/                       # 主 UI(取代舊 popup/)
+│   ├── Sidepanel.vue                # 組合所有區塊 + draft/commit logic
+│   ├── main.ts / index.html
+│   ├── components/
+│   │   ├── AppHeader.vue            # title + active indicator + 版本字串
+│   │   ├── StatusBar.vue            # 連線狀態列(idle / ok / active / error)
+│   │   ├── SettingsSection.vue      # 主開關 + 字級 + ally/enemy/neutral/indicators 副選項
+│   │   ├── DisplayUnitNamesRow.vue  # 「顯示單位名稱」開關列
+│   │   ├── FontSizeSlider.vue       # 字級拉桿
+│   │   ├── IndicatorsRow.vue        # 「畫面外敵人指標」開關
+│   │   ├── CrateSection.vue         # 寶箱 type 多選 grid
+│   │   ├── FilterSection.vue        # custom / preset 切換 + 清單 + 快照
+│   │   ├── ApplyBar.vue             # 篩選 commit 按鈕(含 disabled 邏輯)
+│   │   ├── CheckAnimation.vue       # ApplyBar success 用的打勾動畫
+│   │   ├── ActiveFilterInfo.vue     # 已套用 filter 摘要(模式 / 名稱 / 計數)
+│   │   ├── Toast.vue                # 錯誤通知
+│   │   └── __tests__/               # 每個 component 對應一支 .test.ts
+│   └── __tests__/                   # persistence / saveSnapshot 流程測試
+├── options/                         # MV3 options_ui 頁(open_in_tab)
+│   ├── Options.vue / main.ts / index.html
+├── composables/                     # 共用 composables(從 popup/composables 提升上來)
+│   ├── useRa2Settings.ts            # ra2NamesSettings load/save + legacy migration
+│   ├── useRa2Snapshots.ts           # ra2NamesSnapshots + legacy snapshot 過濾
+│   ├── useRa2Bridge.ts              # webext-bridge sendMessage wrapper
+│   ├── useToast.ts                  # 全域 toast 狀態
+│   ├── useCurrentUrl.ts             # 監聽當前 tab url(判斷是否在 ra2 頁)
+│   ├── useWebExtensionStorage.ts    # 通用 storage ref
+│   └── __tests__/                   # useRa2Snapshots / useToast 測試
+├── components/
+│   ├── Logo.vue / SharedSubtitle.vue
+│   └── ui/                          # AppCheckbox / AppCollapsible / AppSlider / AppSwitch / AppTabs
 ├── constants/
-│   ├── icons.ts
-│   └── powerups.ts            # popup + injected 共用 CRATE_TYPES / POWERUP_LABELS
+│   ├── gameVersion.ts               # RA2_GAME_VERSION 字串(顯示用)
+│   ├── icons.ts                     # action icon path 對應
+│   └── powerups.ts                  # CRATE_TYPES + POWERUP_LABELS (sidepanel + injected 共用)
 ├── logic/
 │   ├── storage.ts
-│   └── tab-status.ts          # RA2 hostname 匹配 + updateIcon
-└── types/
-    └── webext-bridge.d.ts     # popup↔content ProtocolMap
+│   ├── tab-status.ts                # RA2 hostname 匹配 + updateIcon
+│   ├── common-setup.ts
+│   └── index.ts
+├── styles/                          # unocss + 全域 css
+└── types/webext-bridge.d.ts         # popup↔content ProtocolMap
 
-extension/                     # build 產物（勿手動編輯）
-├── manifest.json              # 由 src/manifest.ts 產生
-└── dist/
-    ├── background/index.mjs
-    ├── contentScripts/index.global.js
-    ├── injectedScripts/index.global.js
-    └── popup/index.html
+extension/                           # build 產物(勿手動編輯)
+├── manifest.json                    # 由 src/manifest.ts 產生
+└── dist/{background,contentScripts,injectedScripts,sidepanel,options}/...
 ```
+
+### Vite 多入口
+
+四個獨立 config:`vite.config.mts`(sidepanel + options)、`vite.config.background.mts`、`vite.config.content.mts`、`vite.config.injected.mts`。Inject script 必須以 IIFE bundle 輸出才能直接塞進 `<script>` 注入到 MAIN world。
 
 ### 通訊架構
 
-popup（webext-bridge `sendMessage`） → content script（webext-bridge `onMessage`）
-content script（`pageCmd` via `window.postMessage`） → injected script（`registerMessaging`）
-injected script 回 `{__ra2names:'res'}` → content script `pageCmd` resolve → popup
+```
+sidepanel ── webext-bridge.sendMessage ──▶ contentScript ── window.postMessage ──▶ injected
+sidepanel ◀── webext-bridge.onMessage ──── contentScript ◀── window.postMessage (id 回傳) ── injected
+contentScript / sidepanel ── runtime.sendMessage{cmd:'setIcon'} ──▶ background ── chrome.action.setIcon
+```
 
-content script 收到 `{__ra2names:'ready'}` 後自動讀 `chrome.storage.local['ra2NamesSettings']` 並 apply。
+content script 收到 injected 發出的 `{__ra2names:'ready'}` 後,自動讀 `chrome.storage.local['ra2NamesSettings']` 並 apply(只要任一功能 on);成功則 ping background 切 active icon(`src/contentScripts/index.ts:22-39`)。
 
-content script / popup → background：`chrome.runtime.sendMessage({cmd:'setIcon', active})` 切 action icon。
-
-為何三層必要:
-- **popup**:存得到 `chrome.storage`,送得到 `chrome.tabs.sendMessage`,但不在 page 裡
-- **content script**(isolated world):跟 popup 通訊用 webext-bridge,但看不到 page 的 `System` / `THREE`
+三層必要性:
+- **sidepanel**:存得到 `chrome.storage`,送得到 `chrome.tabs.sendMessage`,但不在 page world
+- **content script**(isolated world):跟 sidepanel 通訊用 webext-bridge,但看不到 page 的 `System` / `THREE`
 - **injected script**(MAIN world):看得到 page globals,但用不到 `chrome.*`
-- **background**:`chrome.action.setIcon` 在 service worker 比較穩,且 popup 關閉時也能由 content script 觸發(例如自動 apply 完)
+- **background**:`chrome.action.setIcon` 在 service worker 比較穩,且 sidepanel 關閉時 content script 也能觸發
 
 ### 指令協定
 
 content script ↔ injected script:`window.postMessage` 每筆帶 `id` / 3 秒 timeout。
-- `apply(opts)` — 套用設定;`opts = { enabled, showNeutral, showIndicators, enabledCrateTypes, fontSize, hiddenUnits }`
-- `status` — 回報目前狀態
-- `getUnitNames` — 列出所有單位 ruleName + displayName
+- `apply(opts)` — 套設定;`opts = { enabled, showNeutral, showAlly, showEnemy, showIndicators, enabledCrateTypes, fontSize, shownUnits }`(注意 `shownUnits` 不是 `shownUnitsCustom` —— content script 在 auto-apply 時做 alias,`index.ts:31`)
+- `status` — 回報目前狀態(`getStatus()` 多回 `showAlly` / `showEnemy` / `systemAvailable` / `threeAvailable` 等 flag,`bridge/commands.ts:101-116`)
+- `getUnitNames` — 回 `{ units: UnitRow[], source: 'rules'|'discovered'|'strings'|'none' }`
 
-content script 收到 injected script 發出的 `{__ra2names:'ready'}` 後,**自動 apply** 已儲存的設定(若任一功能為 on),並通知 background 切 icon。
+### sidepanel UI
 
-### popup UI
+- **顯示單位名稱**(主開關) + 副選項「自己 / 盟友 / 敵方 / 中立」 + 字級拉桿(10–20 px,1px 步進)
+- **畫面外敵人指標**獨立開關
+- **寶箱**:15 種 powerup type 多選 grid(`CrateSection`)
+- **篩選**(`FilterSection`):custom / preset tabs;custom 模式 = checkbox 清單 + 搜尋 + 全選/全不選 + 儲存快照;preset 模式 = 快照下拉 + 刪除。**有 `ApplyBar` 提交按鈕**;尚未提交時主開關不會 instant-apply 篩選變更(filter 走 commit,其餘走 instant —— 見 Section 五 draft/commit 說明)
+- **已套用篩選**(`ActiveFilterInfo`):顯示上一次 apply 的模式 / 名稱 / 已顯示計數
+- **StatusBar**:`idle | ok | active | error` 四態,Sidepanel mount 時 ping `status` + 監聽 `chrome.tabs.onActivated` 更新
 
-- **主開關**「顯示單位名稱」
-- 副選項「顯示中立單位」(主開關關閉時 disable)
-- **字體大小**下拉(10 / 12 / 14 / 16 / 18 / 20 px)
-- **指標**「顯示畫面外敵人指標」(獨立開關)
-- **寶箱**摺疊區:15 種 powerup type 的多選 grid,有「全選 / 全不選」
-- **篩選**摺疊區:custom / preset 兩種模式
-  - custom:checkbox 清單 + 搜尋框 + 「全選 / 全不選」 + 「儲存快照」
-  - preset:選一筆快照(顯示 `已顯示/總數`) + 「刪除」
-- **套用**主按鈕(統一觸發)
-- 狀態列(尚未連線 / 已連線 / 已啟用 / 無法連線)
-- 設定持久化:
-  - `ra2NamesSettings` key — 主設定
-  - `ra2NamesSnapshots` key — 快照陣列
+設定持久化:`ra2NamesSettings`(主)、`ra2NamesSnapshots`(快照陣列)。兩支 composable 各自掛 `storage.onChanged` listener,在跨頁修改時即時同步。
 
 ### manifest.json 重點
 
-```json
+`src/manifest.ts` 動態組裝:
+
+```jsonc
 {
   "manifest_version": 3,
-  "permissions": ["storage", "scripting", "activeTab"],
+  "permissions": ["tabs", "storage", "activeTab", "sidePanel"],
   "host_permissions": [
     "https://game.chronodivide.com/*",
     "https://chronodivide.com/*",
     "https://*.ra2web.com/*",
     "https://ra2web.com/*"
   ],
-  "background": { "service_worker": "background.js" },
-  "content_scripts": [{
-    "matches": [...],
-    "js": ["content.js"],
-    "run_at": "document_idle",
-    "all_frames": true
-  }],
+  "options_ui": { "page": "dist/options/index.html", "open_in_tab": true },
+  "background": { "service_worker": "dist/background/index.mjs" },
+  "side_panel": { "default_path": "dist/sidepanel/index.html" },      // Chromium
+  "sidebar_action": { "default_panel": "dist/sidepanel/index.html" }, // Firefox
+  "content_scripts": [{ "matches": RA2_MATCHES, "js": ["dist/contentScripts/index.global.js"], "run_at": "document_idle", "all_frames": true }],
   "web_accessible_resources": [{
-    "resources": ["injected.js"],
-    "matches": [...]
-  }]
+    "resources": ["dist/contentScripts/style.css", "dist/injectedScripts/index.global.js"],
+    "matches": RA2_MATCHES
+  }],
+  "content_security_policy": { "extension_pages": "script-src 'self'; object-src 'self'" }
 }
 ```
+
+host pattern apex (`ra2web.com`) 和子網域 (`*.ra2web.com`) 必須分開列 —— MV3 match pattern 的 `*.` 不涵蓋裸網域。
 
 ---
 
