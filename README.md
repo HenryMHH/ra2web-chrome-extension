@@ -1,138 +1,45 @@
-# WebExtension Vite Starter
+# RA2 Web 輔助小工具
 
-A [Vite](https://vitejs.dev/) powered WebExtension ([Chrome](https://developer.chrome.com/docs/extensions/reference/), [FireFox](https://addons.mozilla.org/en-US/developers/), etc.) starter template.
+紅色警戒 2 網頁版的 Chrome 擴充套件,讓你打 Chrono Divide / ra2web 的時候看得更清楚、玩得更輕鬆。
 
-<p align="center">
-<sub>Popup</sub><br/>
-<img width="655" src="https://user-images.githubusercontent.com/11247099/126741643-813b3773-17ff-4281-9737-f319e00feddc.png"><br/>
-<sub>Options Page</sub><br/>
-<img width="655" src="https://user-images.githubusercontent.com/11247099/126741653-43125b62-6578-4452-83a7-bee19be2eaa2.png"><br/>
-<sub>Inject Vue App into the Content Script</sub><br/>
-<img src="https://user-images.githubusercontent.com/11247099/130695439-52418cf0-e186-4085-8e19-23fe808a274e.png">
-</p>
+支援網站:`https://game.ra2web.com`。
 
-## Features
+## 安裝與使用
 
-- ⚡️ **Instant HMR** - use **Vite** on dev (no more refresh!)
-- 🥝 Vue 3 - Composition API, [`<script setup>` syntax](https://github.com/vuejs/rfcs/blob/master/active-rfcs/0040-script-setup.md) and more!
-- 💬 Effortless communications - powered by [`webext-bridge`](https://github.com/serversideup/webext-bridge) and [VueUse](https://github.com/antfu/vueuse) storage
-- 🌈 [UnoCSS](https://github.com/unocss/unocss) - The instant on-demand Atomic CSS engine.
-- 🦾 [TypeScript](https://www.typescriptlang.org/) - type safe
-- 📦 [Components auto importing](./src/components)
-- 🌟 [Icons](./src/components) - Access to icons from any iconset directly
-- 🖥 Content Script - Use Vue even in content script
-- 🌍 WebExtension - isomorphic extension for Chrome, Firefox, and others
-- 📃 Dynamic `manifest.json` with full type support
+下載最新版本 [Ra2 Web Assitant](https://github.com/HenryMHH/ra2web-chrome-extension/releases/tag/v1.0.0) (extension.zip)
 
-## Pre-packed
+到 Chrome `chrome://extensions`,開啟「開發人員模式」,點「載入未封裝項目」,選擇 `extension/` 資料夾。
 
-### WebExtension Libraries
+進入遊戲後,點瀏覽器工具列的擴充套件圖示開啟設定面板,勾選想要的功能再按「套用」。
 
-- [`webextension-polyfill`](https://github.com/mozilla/webextension-polyfill) - WebExtension browser API Polyfill with types
-- [`webext-bridge`](https://github.com/serversideup/webext-bridge) - effortlessly communication between contexts
+## 功能
 
-### Vite Plugins
+### 單位名稱
 
-- [`unplugin-auto-import`](https://github.com/unplugin/unplugin-auto-import) - Directly use `browser` and Vue Composition API without importing
-- [`unplugin-vue-components`](https://github.com/unplugin/unplugin-vue-components) - components auto import
-- [`unplugin-icons`](https://github.com/unplugin/unplugin-icons) - icons as components
-  - [Iconify](https://iconify.design) - use icons from any icon sets [🔍Icônes](https://icones.netlify.app/)
+- 每個單位頭上會顯示名字,一眼看清楚場上有什麼
+- **顏色分陣營**:敵人紅色、自己和盟友藍色、中立綠色,不會看錯目標
+- 字體大小可調(10–20 px),配合不同螢幕和縮放
+- 中立單位(平民、動物)可以單獨隱藏,畫面更乾淨
 
-### Vue Plugins
+### 畫面外敵人指標
 
-- [VueUse](https://github.com/antfu/vueuse) - collection of useful composition APIs
+- 螢幕邊緣會出現**紅色箭頭**,告訴你畫面外哪邊有敵人
+- 箭頭旁邊還會顯示是什麼單位,提前準備防守
 
-### UI Frameworks
+### 寶箱內容
 
-- [UnoCSS](https://github.com/unocss/unocss) - the instant on-demand Atomic CSS engine
+- 地圖上的寶箱會直接標出**裡面是什麼**(中文)
+- 15 種寶箱類型可以自己挑要看哪些:裝甲↑、火力↑、金錢、揭示地圖、速度↑、老兵升級、免費單位、無敵護盾、礦石、隱形、黑暗霧、爆炸、核彈、燃燒、基地回復
+- 想搶好東西、想躲核彈寶箱都很方便
 
-### Coding Style
+### 隱藏特定單位
 
-- Use Composition API with [`<script setup>` SFC syntax](https://github.com/vuejs/rfcs/pull/227)
-- [ESLint](https://eslint.org/) with [@antfu/eslint-config](https://github.com/antfu/eslint-config), single quotes, no semi
+- 不想看到的單位可以打勾隱藏(例如礦車、狗、平民)
+- 有搜尋框、全選 / 全不選按鈕
+- 可以把目前的設定**存成預設組合**,下次一鍵切換,適合不同打法
 
-### Dev tools
+### 其他
 
-- [TypeScript](https://www.typescriptlang.org/)
-- [pnpm](https://pnpm.js.org/) - fast, disk space efficient package manager
-- [esno](https://github.com/antfu/esno) - TypeScript / ESNext node runtime powered by esbuild
-- [npm-run-all](https://github.com/mysticatea/npm-run-all) - Run multiple npm-scripts in parallel or sequential
-- [web-ext](https://github.com/mozilla/web-ext) - Streamlined experience for developing web extensions
-
-## Use the Template
-
-### GitHub Template
-
-[Create a repo from this template on GitHub](https://github.com/antfu/vitesse-webext/generate).
-
-### Clone to local
-
-If you prefer to do it manually with the cleaner git history
-
-> If you don't have pnpm installed, run: npm install -g pnpm
-
-```bash
-npx degit antfu/vitesse-webext my-webext
-cd my-webext
-pnpm i
-```
-
-## Usage
-
-### Folders
-
-- `src` - main source.
-  - `contentScript` - scripts and components to be injected as `content_script`
-  - `background` - scripts for background.
-  - `components` - auto-imported Vue components that are shared in popup and options page.
-  - `styles` - styles shared in popup and options page
-  - `assets` - assets used in Vue components
-  - `manifest.ts` - manifest for the extension.
-- `extension` - extension package root.
-  - `assets` - static assets (mainly for `manifest.json`).
-  - `dist` - built files, also serve stub entry for Vite on development.
-- `scripts` - development and bundling helper scripts.
-
-### Development
-
-```bash
-pnpm dev
-```
-
-Then **load extension in browser with the `extension/` folder**.
-
-For Firefox developers, you can run the following command instead:
-
-```bash
-pnpm dev-firefox
-```
-
-`web-ext` auto reload the extension when `extension/` files changed.
-
-> While Vite handles HMR automatically in the most of the case, [Extensions Reloader](https://chromewebstore.google.com/detail/extensions-reloader/fimgfedafeadlieiabdeeaodndnlbhid) is still recommended for cleaner hard reloading.
-
-## Using Gitpod
-
-If you have a web browser, you can get a fully pre-configured development environment with one click:
-
-[![Open in Gitpod](https://gitpod.io/button/open-in-gitpod.svg)](https://gitpod.io/#https://github.com/antfu/vitesse-webext)
-
-### Build
-
-To build the extension, run
-
-```bash
-pnpm build
-```
-
-And then pack files under `extension`, you can upload `extension.crx` or `extension.xpi` to appropriate extension store.
-
-## Credits
-
-[![Volta](https://user-images.githubusercontent.com/904724/195351818-9e826ea9-12a0-4b06-8274-352743cd2047.png)](https://volta.net)
-
-This template is originally made for the [volta.net](https://volta.net) browser extension.
-
-## Variations
-
-This is a variant of [Vitesse](https://github.com/antfu/vitesse), check out the [full variations list](https://github.com/antfu/vitesse#variations).
+- 設定**自動儲存**,下次打開遊戲自動套用,不用每次重設
+- 擴充套件圖示會根據是否啟用變色,一眼知道狀態
+- 不修改任何遊戲檔案,純粹疊在畫面上
