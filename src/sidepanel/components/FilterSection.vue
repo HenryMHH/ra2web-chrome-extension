@@ -126,7 +126,7 @@ async function deleteSelectedPreset() {
                 v-model="query"
                 type="text"
                 placeholder="搜尋單位名稱…"
-                class="w-full rounded-md border border-border bg-input/30 px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                class="w-full rounded-md border border-border bg-input/30 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
               >
             </div>
             <p class="text-xs text-muted-foreground mt-2">
@@ -163,7 +163,7 @@ async function deleteSelectedPreset() {
               <input
                 v-model="snapshotName"
                 placeholder="快照名稱"
-                class="flex-1 rounded-md border border-border bg-input/30 px-2 py-1 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                class="flex-1 rounded-md border border-border bg-input/30 px-2 py-1 text-xs text-foreground placeholder:text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
               >
               <button type="button" class="text-xs px-3 py-1.5 rounded-lg bg-secondary hover:bg-secondary/80 text-secondary-foreground" @click="saveSnapshot">
                 儲存快照
