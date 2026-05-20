@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watchEffect } from 'vue'
+import { version as VERSION } from '../../package.json'
 import AppHeader from '~/sidepanel/components/AppHeader.vue'
 import ApplyBar from '~/sidepanel/components/ApplyBar.vue'
 import StatusBar from '~/popup/components/StatusBar.vue'
@@ -10,8 +11,6 @@ import { useRa2Settings } from '~/popup/composables/useRa2Settings'
 import { useRa2Snapshots } from '~/popup/composables/useRa2Snapshots'
 import { useRa2Bridge } from '~/popup/composables/useRa2Bridge'
 import { useToast } from '~/popup/composables/useToast'
-
-const VERSION = '0.0.1'
 
 const { settings, ready, load, save } = useRa2Settings()
 const { snapshots, load: loadSnapshots } = useRa2Snapshots()
