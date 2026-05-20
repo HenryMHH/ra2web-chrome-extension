@@ -172,31 +172,44 @@ PipOverlay.prototype.update          // 每幀 → 依設定 attach/refresh/deta
 PipOverlay.prototype.dispose         // 單位移除 → detach + 從 pipInstances 移除
 ```
 
-### 全局狀態 (`state`)
+### 全局狀態 — 五個模組
 
-```js
-state = {
-  // 類別參考(loadClasses 後填入)
-  PipOverlay, CanvasUtils, SpriteUtils, Coords, crateTraitRef,
+執行期狀態切成五個模組,放在 `src/injectedScripts/state/`,沒有單一 `state` 物件:
 
-  // 從 instance 採集的全局物件(供 overlay 計算用)
-  activeCamera, alliances, viewer, strings,
+```ts
+// state/settings.ts — 使用者設定(白名單版)
+interface Settings {
+  enabled: boolean
+  showNeutral: boolean
+  showAlly: boolean
+  showEnemy: boolean
+  showIndicators: boolean
+  enabledCrateTypes: Set<number>
+  fontSize: number
+  shownUnits: 'all' | Set<string>   // 大寫 rule name 白名單
+}
 
-  // 使用者設定
-  enabled, showNeutral, showIndicators,
-  enabledCrateTypes: Set<number>,
-  fontSize,
-  hiddenUnits: Set<string>,    // 大寫 rule name
+// state/runtime.ts — SystemJS 取回的 class + 從 PipOverlay instance 採集到的執行期物件
+interface Runtime {
+  PipOverlay, CanvasUtils, SpriteUtils, Coords, crateTraitRef, gameRef
+  activeCamera, alliances, viewer, strings
+}
 
-  // 內部追蹤
-  patched: bool,
-  pipInstances: Set<PipOverlay>,         // 所有活著的 instance
-  discoveredUnits: Map<ruleName, displayName>,
-  lastPipUpdateTime: number,             // 偵測遊戲已結束
-  overlayCanvas, overlayCtx, rafId,      // 覆蓋層
-  origCreate, origUpdate, origDispose,   // 原始 method
-};
+// state/tracking.ts — PipOverlay instance 集合 + label WeakMap + patch flag
+interface Tracking {
+  patched: boolean
+  pipInstances: Set<PipOverlayLike>
+  discoveredUnits: Map<string, string>   // 從 create3DObject patch 累積
+  lastPipUpdateTime: number
+  origCreate, origUpdate, origDispose
+}
+export const labelCache = new WeakMap<PipOverlayLike, LabelCache>()
+
+// state/overlay.ts — overlay canvas / RAF / sweep promise
+// state/log.ts     — TAG / log / warn helper
 ```
+
+import 規則:消費者各取所需(`import { settings } from '../state/settings'`,`import { runtime } from '../state/runtime'`)。寫新功能時不要把這些再合併回一個物件 —— 分檔的目的是讓每個模組對應一種 lifecycle(設定 vs. 執行期參照 vs. 追蹤集合 vs. overlay 控制 vs. log)。
 
 ### 陣營判斷
 
