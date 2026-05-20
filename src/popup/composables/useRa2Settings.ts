@@ -1,6 +1,9 @@
+import { ref } from 'vue'
 import { CRATE_TYPES } from '~/constants/powerups'
 
 const STORAGE_KEY = 'ra2NamesSettings'
+
+export type ShownUnits = 'all' | string[]
 
 export interface Ra2Settings {
   enabled: boolean
@@ -8,7 +11,7 @@ export interface Ra2Settings {
   showIndicators: boolean
   enabledCrateTypes: number[]
   fontSize: number
-  hiddenUnitsCustom: string[]
+  shownUnitsCustom: ShownUnits
   selectedPresetIndex: number
   filterMode: 'custom' | 'preset'
 }
@@ -19,9 +22,23 @@ const DEFAULTS: Ra2Settings = {
   showIndicators: false,
   enabledCrateTypes: [],
   fontSize: 14,
-  hiddenUnitsCustom: [],
+  shownUnitsCustom: 'all',
   selectedPresetIndex: -1,
   filterMode: 'custom',
+}
+
+interface LegacyShape {
+  hiddenUnits?: string[]
+  hiddenUnitsCustom?: string[]
+  showCrateContents?: boolean
+}
+
+function normalizeShown(raw: unknown): ShownUnits {
+  if (raw === 'all')
+    return 'all'
+  if (Array.isArray(raw))
+    return raw.map(s => String(s).toUpperCase())
+  return 'all'
 }
 
 export function useRa2Settings() {
@@ -30,7 +47,7 @@ export function useRa2Settings() {
 
   async function load() {
     const obj = await browser.storage.local.get(STORAGE_KEY)
-    const raw = obj[STORAGE_KEY] as (Partial<Ra2Settings> & { showCrateContents?: boolean, hiddenUnits?: string[] }) | undefined
+    const raw = obj[STORAGE_KEY] as (Partial<Ra2Settings> & LegacyShape) | undefined
     if (!raw) {
       settings.value = { ...DEFAULTS }
     }
@@ -41,13 +58,20 @@ export function useRa2Settings() {
           ? CRATE_TYPES.map(t => t.id)
           : []
       }
+      const legacyHidden = raw.hiddenUnitsCustom ?? raw.hiddenUnits
+      if (raw.shownUnitsCustom === undefined && Array.isArray(legacyHidden) && legacyHidden.length > 0) {
+        // eslint-disable-next-line no-console
+        console.info(
+          '[ra2-names] Migrated settings to whitelist schema; old hide list dropped, defaulting to "show all".',
+        )
+      }
       settings.value = {
         enabled: !!raw.enabled,
         showNeutral: !!raw.showNeutral,
         showIndicators: !!raw.showIndicators,
         enabledCrateTypes,
         fontSize: typeof raw.fontSize === 'number' ? raw.fontSize : 14,
-        hiddenUnitsCustom: Array.isArray(raw.hiddenUnitsCustom) ? raw.hiddenUnitsCustom : (raw.hiddenUnits ?? []),
+        shownUnitsCustom: normalizeShown(raw.shownUnitsCustom),
         selectedPresetIndex: typeof raw.selectedPresetIndex === 'number' ? raw.selectedPresetIndex : -1,
         filterMode: raw.filterMode === 'preset' ? 'preset' : 'custom',
       }

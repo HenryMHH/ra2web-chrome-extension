@@ -10,7 +10,7 @@ interface StoredSettings {
   showIndicators?: boolean
   enabledCrateTypes?: number[]
   fontSize?: number
-  hiddenUnits?: string[]
+  shownUnitsCustom?: 'all' | string[]
 }
 
 ;(() => {
@@ -28,7 +28,7 @@ interface StoredSettings {
       const active = !!(s.enabled || s.showIndicators || (s.enabledCrateTypes?.length ?? 0) > 0)
       if (!active)
         return
-      const res = await pageCmd('apply', s)
+      const res = await pageCmd('apply', { ...s, shownUnits: s.shownUnitsCustom ?? 'all' })
       if (res.ok) {
         browser.runtime.sendMessage({ cmd: 'setIcon', active: true }).catch(() => {})
       }

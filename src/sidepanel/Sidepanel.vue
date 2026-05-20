@@ -21,13 +21,13 @@ const status = ref<{ kind: 'idle' | 'ok' | 'active' | 'error', text: string }>({
 load()
 loadSnapshots()
 
-const effectiveHiddenUnits = computed<string[]>(() => {
+const effectiveShownUnits = computed<'all' | string[]>(() => {
   if (settings.value.filterMode === 'preset'
     && settings.value.selectedPresetIndex >= 0
     && snapshots.value[settings.value.selectedPresetIndex]) {
-    return snapshots.value[settings.value.selectedPresetIndex].hiddenUnits
+    return snapshots.value[settings.value.selectedPresetIndex].shownUnits
   }
-  return settings.value.hiddenUnitsCustom
+  return settings.value.shownUnitsCustom
 })
 
 async function refreshStatus() {
@@ -66,7 +66,7 @@ async function apply() {
     showIndicators: settings.value.showIndicators,
     enabledCrateTypes: settings.value.enabledCrateTypes,
     fontSize: settings.value.fontSize,
-    hiddenUnits: effectiveHiddenUnits.value,
+    shownUnits: effectiveShownUnits.value,
   })
   if (r.ok) {
     const active = settings.value.enabled || settings.value.showIndicators || settings.value.enabledCrateTypes.length > 0
@@ -92,7 +92,7 @@ async function apply() {
     <IndicatorsRow v-model="settings.showIndicators" />
     <CrateGrid v-model="settings.enabledCrateTypes" />
     <UnitFilter
-      v-model:hiddenUnitsCustom="settings.hiddenUnitsCustom"
+      v-model:shownUnitsCustom="settings.shownUnitsCustom"
       v-model:filterMode="settings.filterMode"
       v-model:selectedPresetIndex="settings.selectedPresetIndex"
     />

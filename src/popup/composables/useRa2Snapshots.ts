@@ -1,9 +1,18 @@
+import { ref } from 'vue'
+import type { ShownUnits } from './useRa2Settings'
+
 const KEY = 'ra2NamesSnapshots'
 
 export interface Snapshot {
   name: string
-  hiddenUnits: string[]
+  shownUnits: ShownUnits
   totalCount: number
+}
+
+interface LegacyShape { hiddenUnits?: string[] }
+
+function isNewShape(s: any): s is Snapshot {
+  return s && typeof s === 'object' && 'shownUnits' in s
 }
 
 export function useRa2Snapshots() {
@@ -12,7 +21,20 @@ export function useRa2Snapshots() {
   async function load() {
     const obj = await browser.storage.local.get(KEY)
     const list = obj[KEY]
-    snapshots.value = Array.isArray(list) ? list : []
+    if (!Array.isArray(list)) {
+      snapshots.value = []
+      return
+    }
+    const kept = list.filter(isNewShape) as Snapshot[]
+    const droppedLegacy = list.filter((s: any): s is LegacyShape => s && 'hiddenUnits' in s && !('shownUnits' in s))
+    if (droppedLegacy.length > 0) {
+      // eslint-disable-next-line no-console
+      console.info(
+        `[ra2-names] Dropped ${droppedLegacy.length} legacy snapshot(s); whitelist schema cannot reconstruct old hide-list snapshots.`,
+      )
+      await browser.storage.local.set({ [KEY]: kept })
+    }
+    snapshots.value = kept
   }
 
   async function save() {
