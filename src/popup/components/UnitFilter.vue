@@ -1,5 +1,12 @@
+<script lang="ts">
+// Module-level singleton. In production there is only ever one
+// popup/sidepanel instance of UnitFilter; this ensures only the
+// most-recently-mounted instance reacts to visibility events even if
+// stale instances are still in the DOM (e.g. across test cases).
+</script>
+
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRa2Bridge } from '~/popup/composables/useRa2Bridge'
 import { useRa2Snapshots } from '~/popup/composables/useRa2Snapshots'
 
@@ -13,20 +20,60 @@ const emit = defineEmits<{
   (e: 'update:filterMode', v: 'custom' | 'preset'): void
   (e: 'update:selectedPresetIndex', v: number): void
 }>()
+let __currentVisibilityHandler: (() => void) | null = null
+let __visibilityListenerInstalled = false
+function __ensureVisibilityListener() {
+  if (__visibilityListenerInstalled)
+    return
+  __visibilityListenerInstalled = true
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && __currentVisibilityHandler)
+      __currentVisibilityHandler()
+  })
+}
 
 const bridge = useRa2Bridge()
 const { snapshots, load: loadSnapshots, add: addSnapshot, remove: removeSnapshot } = useRa2Snapshots()
 const allUnits = ref<Array<[string, string]>>([])
 const query = ref('')
 const snapshotName = ref('')
+const fetching = ref(false)
+const lastSource = ref<string>('')
 
 loadSnapshots()
 
 async function fetchUnits() {
-  const r = await bridge.getUnitNames()
-  allUnits.value = (r.units ?? []).map(([k, v]) => [k, v])
+  if (fetching.value)
+    return
+  fetching.value = true
+  try {
+    const r = await bridge.getUnitNames()
+    const units = Array.isArray(r?.units) ? r.units : []
+    allUnits.value = units.map(([k, v]) => [k, v])
+    lastSource.value = r?.source ?? 'none'
+  }
+  catch (e) {
+    console.warn('[ra2-names] fetchUnits failed:', e)
+    lastSource.value = 'error'
+  }
+  finally {
+    fetching.value = false
+  }
 }
-fetchUnits()
+
+function onDetailsToggle() {
+  fetchUnits()
+}
+
+onMounted(() => {
+  fetchUnits()
+  __currentVisibilityHandler = fetchUnits
+  __ensureVisibilityListener()
+})
+onBeforeUnmount(() => {
+  if (__currentVisibilityHandler === fetchUnits)
+    __currentVisibilityHandler = null
+})
 
 const hidden = computed(() => new Set(props.hiddenUnitsCustom))
 const filtered = computed(() => {
@@ -68,8 +115,28 @@ async function deleteSelectedPreset() {
 </script>
 
 <template>
-  <details>
+  <details @toggle="onDetailsToggle">
     <summary>單位篩選</summary>
+
+    <div class="head">
+      <span class="meta">
+        {{ allUnits.length }} 筆
+        <span v-if="lastSource" class="src">({{ lastSource }})</span>
+      </span>
+      <button
+        type="button"
+        data-testid="unit-refresh"
+        :disabled="fetching"
+        @click="fetchUnits"
+      >
+        {{ fetching ? '抓取中…' : '重新整理' }}
+      </button>
+    </div>
+
+    <p v-if="allUnits.length === 0 && !fetching" class="empty">
+      尚未抓到單位清單。請先進入對局，再按「重新整理」。
+    </p>
+
     <div class="modes">
       <label>
         <input
@@ -132,6 +199,10 @@ async function deleteSelectedPreset() {
 </template>
 
 <style scoped>
+.head { display: flex; justify-content: space-between; align-items: center; margin: 6px 0; }
+.meta { font-size: 12px; color: #666; }
+.src { color: #888; font-family: monospace; }
+.empty { font-size: 12px; color: #b00; margin: 6px 0; }
 .modes { display: flex; gap: 8px; margin: 6px 0; }
 .list { max-height: 200px; overflow-y: auto; border: 1px solid #ddd; padding: 4px; }
 .item { display: flex; gap: 6px; align-items: center; font-size: 12px; }
