@@ -45,48 +45,65 @@ function normalizeShown(raw: unknown): ShownUnits {
   return 'all'
 }
 
+function normalizeSettings(raw: (Partial<Ra2Settings> & LegacyShape) | undefined): Ra2Settings {
+  if (!raw)
+    return { ...DEFAULTS }
+  let enabledCrateTypes = raw.enabledCrateTypes
+  if (!Array.isArray(enabledCrateTypes)) {
+    enabledCrateTypes = raw.showCrateContents
+      ? CRATE_TYPES.map(t => t.id)
+      : []
+  }
+  return {
+    enabled: !!raw.enabled,
+    showNeutral: !!raw.showNeutral,
+    showAlly: raw.showAlly !== false,
+    showEnemy: raw.showEnemy !== false,
+    showIndicators: !!raw.showIndicators,
+    enabledCrateTypes,
+    fontSize: typeof raw.fontSize === 'number' ? raw.fontSize : 14,
+    shownUnitsCustom: normalizeShown(raw.shownUnitsCustom),
+    selectedPresetIndex: typeof raw.selectedPresetIndex === 'number' ? raw.selectedPresetIndex : -1,
+    filterMode: raw.filterMode === 'preset' ? 'preset' : 'custom',
+  }
+}
+
+const settings = ref<Ra2Settings>({ ...DEFAULTS })
+const ready = ref(false)
+let listenerInstalled = false
+
+function installListener() {
+  if (listenerInstalled || typeof browser === 'undefined' || !browser.storage?.onChanged)
+    return
+  listenerInstalled = true
+  browser.storage.onChanged.addListener((changes, area) => {
+    if (area !== 'local' || !changes[STORAGE_KEY])
+      return
+    settings.value = normalizeSettings(changes[STORAGE_KEY].newValue)
+  })
+}
+
 export function useRa2Settings() {
-  const settings = ref<Ra2Settings>({ ...DEFAULTS })
-  const ready = ref(false)
+  installListener()
 
   async function load() {
     const obj = await browser.storage.local.get(STORAGE_KEY)
     const raw = obj[STORAGE_KEY] as (Partial<Ra2Settings> & LegacyShape) | undefined
-    if (!raw) {
-      settings.value = { ...DEFAULTS }
+    const legacyHidden = raw?.hiddenUnitsCustom ?? raw?.hiddenUnits
+    if (raw && raw.shownUnitsCustom === undefined && Array.isArray(legacyHidden) && legacyHidden.length > 0) {
+      // eslint-disable-next-line no-console
+      console.info(
+        '[ra2-names] Migrated settings to whitelist schema; old hide list dropped, defaulting to "show all".',
+      )
     }
-    else {
-      let enabledCrateTypes = raw.enabledCrateTypes
-      if (!Array.isArray(enabledCrateTypes)) {
-        enabledCrateTypes = raw.showCrateContents
-          ? CRATE_TYPES.map(t => t.id)
-          : []
-      }
-      const legacyHidden = raw.hiddenUnitsCustom ?? raw.hiddenUnits
-      if (raw.shownUnitsCustom === undefined && Array.isArray(legacyHidden) && legacyHidden.length > 0) {
-        // eslint-disable-next-line no-console
-        console.info(
-          '[ra2-names] Migrated settings to whitelist schema; old hide list dropped, defaulting to "show all".',
-        )
-      }
-      settings.value = {
-        enabled: !!raw.enabled,
-        showNeutral: !!raw.showNeutral,
-        showAlly: raw.showAlly !== false,
-        showEnemy: raw.showEnemy !== false,
-        showIndicators: !!raw.showIndicators,
-        enabledCrateTypes,
-        fontSize: typeof raw.fontSize === 'number' ? raw.fontSize : 14,
-        shownUnitsCustom: normalizeShown(raw.shownUnitsCustom),
-        selectedPresetIndex: typeof raw.selectedPresetIndex === 'number' ? raw.selectedPresetIndex : -1,
-        filterMode: raw.filterMode === 'preset' ? 'preset' : 'custom',
-      }
-    }
+    settings.value = normalizeSettings(raw)
     ready.value = true
   }
 
   async function save() {
-    await browser.storage.local.set({ [STORAGE_KEY]: { ...settings.value } })
+    // JSON-roundtrip strips Vue reactive Proxy wrappers; chrome.storage.local.set
+    // uses structured clone and throws DataCloneError on reactive arrays/objects.
+    await browser.storage.local.set({ [STORAGE_KEY]: JSON.parse(JSON.stringify(settings.value)) })
   }
 
   return { settings, ready, load, save }
