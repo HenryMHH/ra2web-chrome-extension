@@ -2,13 +2,15 @@ import type * as THREE from 'three'
 
 export type Team = 'enemy' | 'self' | 'ally' | 'neutral' | 'unknown'
 
+export type ShownUnits = 'all' | string[]
+
 export interface ApplyOpts {
   enabled?: boolean
   showNeutral?: boolean
   showIndicators?: boolean
   enabledCrateTypes?: number[]
   fontSize?: number
-  hiddenUnits?: string[]
+  shownUnits?: ShownUnits
 }
 
 export interface ApplyResult {

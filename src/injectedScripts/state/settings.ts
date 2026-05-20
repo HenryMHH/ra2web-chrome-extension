@@ -4,7 +4,7 @@ export interface Settings {
   showIndicators: boolean
   enabledCrateTypes: Set<number>
   fontSize: number
-  hiddenUnits: Set<string>
+  shownUnits: 'all' | Set<string>
 }
 
 export const settings: Settings = {
@@ -13,5 +13,5 @@ export const settings: Settings = {
   showIndicators: false,
   enabledCrateTypes: new Set<number>(),
   fontSize: 14,
-  hiddenUnits: new Set<string>(),
+  shownUnits: 'all',
 }

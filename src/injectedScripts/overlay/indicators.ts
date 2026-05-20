@@ -32,8 +32,8 @@ export function drawIndicators(
       for (const go of player.getOwnedObjects()) {
         if (go.isDestroyed || !go.position)
           continue
-        if (settings.hiddenUnits.size > 0
-          && settings.hiddenUnits.has(go.rules?.name?.toUpperCase() ?? '')) {
+        if (settings.shownUnits !== 'all'
+          && !settings.shownUnits.has(go.rules?.name?.toUpperCase() ?? '')) {
           continue
         }
         try {

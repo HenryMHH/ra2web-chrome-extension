@@ -24,9 +24,15 @@ export async function apply(opts: ApplyOpts): Promise<ApplyResult> {
       ? opts.enabledCrateTypes.map(Number).filter(Number.isFinite)
       : [],
   )
-  settings.hiddenUnits = new Set(
-    Array.isArray(opts.hiddenUnits) ? opts.hiddenUnits.map(s => String(s).toUpperCase()) : [],
-  )
+  if (opts.shownUnits === 'all') {
+    settings.shownUnits = 'all'
+  }
+  else if (Array.isArray(opts.shownUnits)) {
+    settings.shownUnits = new Set(opts.shownUnits.map(s => String(s).toUpperCase()))
+  }
+  else {
+    settings.shownUnits = 'all'
+  }
   if (typeof opts.fontSize === 'number' && opts.fontSize >= 10 && opts.fontSize <= 20) {
     settings.fontSize = opts.fontSize
   }
