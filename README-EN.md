@@ -1,4 +1,5 @@
-# RA2 Web Assistant
+# RA2 Web Assistant [[zh-TW](https://github.com/HenryMHH/ra2web-chrome-extension/blob/main/README.md)] [[CN](https://github.com/HenryMHH/ra2web-chrome-extension/blob/main/README-CN.md)]
+
 
 A Chrome extension for the Red Alert 2 web port — makes Chrono Divide / ra2web easier to read and play.
 
