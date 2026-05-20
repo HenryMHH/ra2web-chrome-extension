@@ -94,11 +94,11 @@ strings.data;                  // 整份 i18n table,key 形如 "name:E1"
 
 **單位清單的來源(三段 fallback)**
 
-1. `state.gameRef.rules.{infantry,vehicle,aircraft,building}Rules` — 當局實際載入的 rules Map,key 為 `rules.name`,value 為 rule object;displayName 由 `strings.get(rule.uiName)` 解析。**首選**,鎖定當局 rule 集合,且與 `shouldShowLabel` 的比對 key 同字典。
-2. `state.discoveredUnits` — 從 `PipOverlay.create3DObject` patch 累積的當局實際出場單位。
-3. `state.strings.data` 的 `name:*` keys — i18n 字典,bundle 內固定,所有局共用。**僅作最後 fallback**,因為多個 rule 共享同一 `uiName` 時(例如 ADOG / DOG / SDOG 共享 `name:DOG`)會合併成單一條目,造成「勾 DOG 不會隱藏 ADOG」這類 mismatch。
+1. `runtime.gameRef.rules.{infantry,vehicle,aircraft,building}Rules` — 當局實際載入的 rules Map,key 為 `rules.name`,value 為 rule object;displayName 由 `strings.get(rule.uiName)` 解析。**首選**,鎖定當局 rule 集合,且與 `shouldShowLabel` 的比對 key 同字典。
+2. `tracking.discoveredUnits` — 從 `PipOverlay.create3DObject` patch 累積的當局實際出場單位。
+3. `runtime.strings.data` 的 `name:*` keys — i18n 字典,bundle 內固定,所有局共用。**僅作最後 fallback**,因為多個 rule 共享同一 `uiName` 時(例如 ADOG / DOG / SDOG 共享 `name:DOG`)會合併成單一條目,造成「勾 DOG 不會隱藏 ADOG」這類 mismatch。
 
-`state.gameRef` 在 `CrateGeneratorTrait.prototype.init(game)` patch 中捕獲(同一 patch 已用於 `state.crateTraitRef`)。
+`runtime.gameRef` 在 `CrateGeneratorTrait.prototype.init(game)` patch 中捕獲(同一 patch 已用於 `runtime.crateTraitRef`)。
 
 ### 取得「玩家列表」(掃描畫面外敵人用)
 
@@ -142,7 +142,7 @@ const [P, CU, SU, CO, CGT] = await Promise.all([
 
 ### Eager patch
 
-injected.js 載入即執行 `loadClasses().then(patchPrototype)`,**不等 popup 「套用」**。如此即使使用者在開局後才打開 popup 啟用功能,所有開局時就生成的單位 PipOverlay 也已經被 patch 過、登錄到 `pipInstances`,可以在 `apply()` 時立即 sweep 補標籤。
+injected.js 載入即執行 `loadClasses().then(patchPrototype)`,**不等 sidepanel 「套用」**。如此即使使用者在開局後才打開 sidepanel 啟用功能,所有開局時就生成的單位 PipOverlay 也已經被 patch 過、登錄到 `tracking.pipInstances`,可以在 `apply()` 時立即 sweep 補標籤。
 
 ### 取得 trait 的 ref
 
@@ -150,12 +150,12 @@ injected.js 載入即執行 `loadClasses().then(patchPrototype)`,**不等 popup 
 
 ```js
 CGT.prototype.init = function (game) {
-  state.crateTraitRef = this;           // 標準路徑
-  state.discoveredUnits.clear();         // 換局時清空已發現單位
+  runtime.crateTraitRef = this;           // 標準路徑
+  tracking.discoveredUnits.clear();       // 換局時清空已發現單位
   return origInit.apply(this, arguments);
 };
 CGT.prototype.spawnCrateAt = function () {
-  if (!state.crateTraitRef) state.crateTraitRef = this;  // 開局後才啟用的 fallback
+  if (!runtime.crateTraitRef) runtime.crateTraitRef = this;  // 開局後才啟用的 fallback
   return origSpawn.apply(this, arguments);
 };
 ```
@@ -239,10 +239,10 @@ function resolveTeam(self) {
 ### Label 建立流程 (`buildLabel`)
 
 1. 拿 displayName(`resolveName`)和 team(`resolveTeam`)
-2. 創建 `<canvas>`,用 `state.CanvasUtils.drawText` 把每一行畫上去(會 autoEnlarge canvas)
+2. 創建 `<canvas>`,用 `runtime.CanvasUtils.drawText` 把每一行畫上去(會 autoEnlarge canvas)
 3. 將像素往右下 shift 1px(`putImageData(imgData, 1, 1)`)補一個邊框緩衝,模仿 DebugLabel 的後處理
 4. 包成 `THREE.Texture`(NearestFilter, flipY:true, needsUpdate:true)
-5. 用 `state.SpriteUtils.createSpriteGeometry` 建 sprite geometry(永遠面向相機)
+5. 用 `runtime.SpriteUtils.createSpriteGeometry` 建 sprite geometry(永遠面向相機)
 6. `MeshBasicMaterial({ map, transparent:true, depthTest:false })`,renderOrder 設高(`999998`)蓋在最頂
 7. mesh.userData.`__unameLbl` = true(供之後 sweep 用)
 8. mesh.userData.`__unameLblDisposer` 是 dispose helper
@@ -278,10 +278,10 @@ settings.shownUnits === 'all'  → 通過
 
 ### 既存單位的處理 — `pipInstances` 集合
 
-Eager patch 確保所有 `create3DObject` 呼叫都會把 `this` 加進 `state.pipInstances`。
+Eager patch 確保所有 `create3DObject` 呼叫都會把 `this` 加進 `tracking.pipInstances`。
 為以防萬一 update 看到沒被追蹤的 instance(理論上不該發生)也補登錄。
 
-`apply()` 啟用時:`for (const pip of state.pipInstances) attachLabel(pip)` 立即補標籤,不需等下一幀 update。
+`apply()` 啟用時:`for (const pip of tracking.pipInstances) attachLabel(pip)` 立即補標籤,不需等下一幀 update。
 
 ### Label 移除(關閉功能時)— `sweepLeftoverLabels`
 
@@ -292,27 +292,27 @@ Eager patch 確保所有 `create3DObject` 呼叫都會把 `this` 加進 `state.p
 3. `root.traverse(o => userData.__unameLbl && ...)` 收集再移除
 4. 呼叫 `__unameLblDisposer` 釋放 GPU 資源
 5. 超時 2s fallback(避免卡住)
-6. 結束後 `state.sweepPromise = null`(避免並行 sweep)
+6. 結束後 `overlayState.sweepPromise = null`(避免並行 sweep)
 
 ---
 
 ## 四、畫面外指標 + 寶箱 overlay
 
-兩者共用同一 canvas(`state.overlayCanvas`)和同一 RAF loop(`drawOverlay`):
+兩者共用同一 canvas(`overlayState.overlayCanvas`)和同一 RAF loop(`drawOverlay`):
 
 ```js
 position:fixed; top:0; left:0; pointer-events:none; z-index:9999
 ```
 
 每幀:
-1. `state.showIndicators || state.enabledCrateTypes.size > 0` 是否任一啟用,否則停止 RAF
+1. `settings.showIndicators || settings.enabledCrateTypes.size > 0` 是否任一啟用,否則停止 RAF
 2. 對 canvas 重設大小、清空
 3. **若 `lastPipUpdateTime` 超過 2s 沒被更新**(代表遊戲已結束/暫停),保持空白不畫(避免畫到死亡座標)
-4. 若 indicators 開:遍歷 `alliances.playerList.players`,過濾非敵方(self / neutral / 盟友)和 `hiddenUnits`,對 enemy 單位 `worldPosition.project(camera)` → 螢幕座標
+4. 若 indicators 開:遍歷 `alliances.playerList.players`,過濾非敵方(self / neutral / 盟友)和 `shownUnits` 白名單,對 enemy 單位 `worldPosition.project(camera)` → 螢幕座標
    - 若在 viewport 內(扣掉 24px MARGIN)跳過
    - 否則畫紅色實心箭頭(指向單位)貼在邊緣,並在箭頭旁邊畫單位名稱小標籤
-5. 若 crate types 開:呼叫 `drawCrateLabels`,遍歷 `state.crateTraitRef.crates`
-   - 過濾 `state.enabledCrateTypes` 有勾選的 powerup type
+5. 若 crate types 開:呼叫 `drawCrateLabels`,遍歷 `runtime.crateTraitRef.crates`
+   - 過濾 `settings.enabledCrateTypes` 有勾選的 powerup type
    - 從 `crate.obj.position.worldPosition`(或 fallback 到 `Coords.tile3dToWorld(tile.rx+0.5, tile.ry+0.5, tile.z)`)取座標,project → 螢幕座標
    - 在寶箱位置上方畫金色標籤(含 powerup 中文名)
 
@@ -325,7 +325,7 @@ position:fixed; top:0; left:0; pointer-events:none; z-index:9999
 15 爆炸     16 核彈     17 燃燒
 ```
 
-(對應 `POWERUP_LABELS` 和 popup `CRATE_TYPES`,兩處要同步。)
+(對應 `POWERUP_LABELS` 和 sidepanel `CRATE_TYPES`,兩處要同步。)
 
 ### 共用 `_tmpV3`
 
