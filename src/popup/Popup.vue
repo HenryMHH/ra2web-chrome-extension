@@ -18,8 +18,12 @@ const status = ref<{ kind: 'idle' | 'ok' | 'active' | 'error', text: string }>({
   text: '尚未連線',
 })
 
-load()
-loadSnapshots()
+async function init() {
+  await Promise.all([load(), loadSnapshots()])
+  if (settings.value.selectedPresetIndex >= snapshots.value.length)
+    settings.value.selectedPresetIndex = -1
+}
+init()
 
 const effectiveShownUnits = computed<'all' | string[]>(() => {
   if (settings.value.filterMode === 'preset'
