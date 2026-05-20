@@ -533,13 +533,18 @@ host pattern apex (`ra2web.com`) 和子網域 (`*.ra2web.com`) 必須分開列 �
 
 ## 七、行為總表
 
-### 名稱標示
+### 名稱標示(每個 team 獨立開關)
 
-| 名稱開關 | 中立開關 | 結果 |
-| -------- | -------- | ---- |
-| ON  | ON  | 全部敵/我/盟/中立都有標籤 |
-| ON  | OFF | 中立隱藏,其他都有 |
-| OFF | —   | sweep 場上所有 label |
+| `enabled` | `showAlly` | `showEnemy` | `showNeutral` | 顯示哪些 label |
+| --------- | ---------- | ----------- | ------------- | --------------- |
+| OFF       | —          | —           | —             | **全部 sweep**(無論勾選) |
+| ON        | ON         | ON          | ON            | self + ally + enemy + neutral |
+| ON        | ON         | ON          | OFF           | self + ally + enemy |
+| ON        | OFF        | ON          | —             | self + enemy(+ neutral 視 `showNeutral`) |
+| ON        | ON         | OFF         | —             | self + ally(+ neutral 視 `showNeutral`) |
+| ON        | OFF        | OFF         | OFF           | 只剩 self |
+
+`'self'` 永遠通過 policy gate;`showAlly` / `showEnemy` 預設為 `true`(`settings.ts:12-21`),所以開啟主開關就會看到「我方 + 盟友 + 敵方」三種。
 
 ### 陣營色
 
@@ -552,9 +557,9 @@ host pattern apex (`ra2web.com`) 和子網域 (`*.ra2web.com`) 必須分開列 �
 
 ### 畫面外指標
 
-| 指標開關 | 結果 |
-|---------|------|
-| ON | viewport 邊緣紅色箭頭 + 單位名稱小標籤,指向畫面外敵方單位(`hiddenUnits` 過濾後) |
+| `showIndicators` | 結果 |
+|-----------------|------|
+| ON | viewport 邊緣紅色箭頭 + 單位名稱小標籤,指向畫面外敵方單位。**會套用 policy gate** —— `shownUnits` 白名單同樣作用於指標(白名單模式下沒勾的單位也不會被指標標出) |
 | OFF | 若寶箱也關 → overlay canvas 移除、RAF 停止 |
 
 ### 寶箱
@@ -564,9 +569,18 @@ host pattern apex (`ra2web.com`) 和子網域 (`*.ra2web.com`) 必須分開列 �
 | 0 | 不畫寶箱 label |
 | ≥ 1 | overlay 中以金色標籤標出對應 powerup type 的寶箱位置(中文名) |
 
+### 單位篩選(`shownUnits` 白名單)
+
+| `settings.shownUnits` | 結果 |
+|-----------------------|------|
+| `'all'` | 略過白名單檢查,所有(通過 team gate 的)單位都顯示 |
+| `Set<string>`(可空) | 只顯示 `gameObject.rules.name.toUpperCase()` 在 Set 中的單位 |
+
+實際送進 injected 的值由 sidepanel 端依 `filterMode` 計算:custom → `shownUnitsCustom`、preset → 快照的 `shownUnits`。
+
 ### 字體大小
 
-10–20 px。改動會被 `refreshLabel` 比對偵測,所有現存 label 在下一幀重建。
+10–20 px(`AppSlider` 1px 步進)。改動會被 `refreshLabel` 比對偵測,所有現存 label 在下一幀重建。
 
 ---
 
