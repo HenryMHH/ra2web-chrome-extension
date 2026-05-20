@@ -12,6 +12,10 @@
 
 進入遊戲後,點瀏覽器工具列的擴充套件圖示開啟設定面板,勾選想要的功能再按「套用」。
 
+## 遊戲展示
+
+https://github.com/user-attachments/assets/d0277982-acde-4cdc-8060-2a64dd7a5eeb
+
 ## 功能
 
 ### 單位名稱
