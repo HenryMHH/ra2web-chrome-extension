@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watchEffect } from 'vue'
 import { version as VERSION } from '../../package.json'
 import AppHeader from '~/sidepanel/components/AppHeader.vue'
 import ApplyBar from '~/sidepanel/components/ApplyBar.vue'
+import SettingsSection from '~/sidepanel/components/SettingsSection.vue'
 import StatusBar from '~/popup/components/StatusBar.vue'
 import ActiveFilterInfo from '~/popup/components/ActiveFilterInfo.vue'
 import type { AppliedFilter } from '~/popup/components/ActiveFilterInfo.vue'
@@ -105,7 +106,7 @@ async function apply() {
       <div class="max-h-[520px] overflow-y-auto">
         <StatusBar :kind="status.kind" :text="status.text" />
         <ActiveFilterInfo :applied="lastApplied" />
-        <!-- placeholder: SettingsSection (Task 6) -->
+        <SettingsSection :settings="settings" />
         <!-- placeholder: CrateSection (Task 7) -->
         <!-- placeholder: FilterSection (Task 8) -->
       </div>
