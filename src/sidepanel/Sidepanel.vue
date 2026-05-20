@@ -106,7 +106,14 @@ async function apply() {
       <div class="max-h-[520px] overflow-y-auto">
         <StatusBar :kind="status.kind" :text="status.text" />
         <ActiveFilterInfo :applied="lastApplied" />
-        <SettingsSection :settings="settings" />
+        <SettingsSection
+          v-model:enabled="settings.enabled"
+          v-model:show-ally="settings.showAlly"
+          v-model:show-enemy="settings.showEnemy"
+          v-model:show-neutral="settings.showNeutral"
+          v-model:show-indicators="settings.showIndicators"
+          v-model:font-size="settings.fontSize"
+        />
         <!-- placeholder: CrateSection (Task 7) -->
         <!-- placeholder: FilterSection (Task 8) -->
       </div>

@@ -8,7 +8,7 @@ describe('fontSizeSlider', () => {
     expect(w.text()).toMatch(/14\s*px/)
   })
 
-  it('shows label "Label Font Size"', () => {
+  it('shows the 字體大小 label', () => {
     const w = mount(FontSizeSlider, { props: { modelValue: 14 } })
     expect(w.text()).toContain('字體大小')
   })

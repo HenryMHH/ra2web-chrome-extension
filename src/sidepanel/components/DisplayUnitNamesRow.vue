@@ -8,12 +8,21 @@ defineProps<{
   enemy: boolean
   neutral: boolean
 }>()
-defineEmits<{
+const emit = defineEmits<{
   'update:modelValue': [v: boolean]
   'update:ally': [v: boolean]
   'update:enemy': [v: boolean]
   'update:neutral': [v: boolean]
 }>()
+
+function emitFaction(f: 'ally' | 'enemy' | 'neutral', v: boolean) {
+  if (f === 'ally')
+    emit('update:ally', v)
+  else if (f === 'enemy')
+    emit('update:enemy', v)
+  else
+    emit('update:neutral', v)
+}
 </script>
 
 <template>
@@ -27,7 +36,7 @@ defineEmits<{
           在每個單位上方顯示陣營色名稱
         </p>
       </div>
-      <AppSwitch data-testid="display-toggle" :model-value="modelValue" @update:model-value="$emit('update:modelValue', $event)" />
+      <AppSwitch data-testid="display-toggle" :model-value="modelValue" @update:model-value="emit('update:modelValue', $event)" />
     </div>
     <div class="flex gap-2 pl-1">
       <label
@@ -40,7 +49,7 @@ defineEmits<{
         <AppCheckbox
           :model-value="$props[f]"
           :disabled="!modelValue"
-          @update:model-value="$emit(`update:${f}` as any, $event)"
+          @update:model-value="emitFaction(f, $event)"
         />
         <span class="text-sm text-secondary-foreground">
           {{ f === 'ally' ? 'Ally' : f === 'enemy' ? 'Enemy' : 'Neutral' }}
