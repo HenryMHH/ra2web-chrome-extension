@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watchEffect } from 'vue'
-import { version as VERSION } from '../../package.json'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, watchEffect } from 'vue'
+import { RA2_GAME_VERSION as VERSION } from '~/constants/gameVersion'
 import AppHeader from '~/sidepanel/components/AppHeader.vue'
 import ApplyBar from '~/sidepanel/components/ApplyBar.vue'
 import SettingsSection from '~/sidepanel/components/SettingsSection.vue'
@@ -10,6 +10,7 @@ import StatusBar from '~/popup/components/StatusBar.vue'
 import ActiveFilterInfo from '~/popup/components/ActiveFilterInfo.vue'
 import type { AppliedFilter } from '~/popup/components/ActiveFilterInfo.vue'
 import Toast from '~/popup/components/Toast.vue'
+import type { ShownUnits } from '~/popup/composables/useRa2Settings'
 import { useRa2Settings } from '~/popup/composables/useRa2Settings'
 import { useRa2Snapshots } from '~/popup/composables/useRa2Snapshots'
 import { useRa2Bridge } from '~/popup/composables/useRa2Bridge'
@@ -26,14 +27,39 @@ const status = ref<{ kind: 'idle' | 'ok' | 'active' | 'error', text: string }>({
 const totalCount = ref(0)
 const lastApplied = ref<AppliedFilter | null>(null)
 
+const draftFilter = ref<{
+  shownUnitsCustom: ShownUnits
+  filterMode: 'custom' | 'preset'
+  selectedPresetIndex: number
+}>({
+  shownUnitsCustom: 'all',
+  filterMode: 'custom',
+  selectedPresetIndex: -1,
+})
+
+function syncDraftFromSettings() {
+  draftFilter.value = {
+    shownUnitsCustom: Array.isArray(settings.value.shownUnitsCustom)
+      ? [...settings.value.shownUnitsCustom]
+      : settings.value.shownUnitsCustom,
+    filterMode: settings.value.filterMode,
+    selectedPresetIndex: settings.value.selectedPresetIndex,
+  }
+}
+
+let suppressInstant = true
+
 async function init() {
   await Promise.all([load(), loadSnapshots()])
   if (settings.value.selectedPresetIndex >= snapshots.value.length)
     settings.value.selectedPresetIndex = -1
+  syncDraftFromSettings()
+  await nextTick()
+  suppressInstant = false
 }
 init()
 
-const effectiveShownUnits = computed<'all' | string[]>(() => {
+const appliedShownUnits = computed<ShownUnits>(() => {
   if (
     settings.value.filterMode === 'preset'
     && settings.value.selectedPresetIndex >= 0
@@ -43,6 +69,21 @@ const effectiveShownUnits = computed<'all' | string[]>(() => {
   }
   return settings.value.shownUnitsCustom
 })
+
+function shownUnitsEqual(a: ShownUnits, b: ShownUnits): boolean {
+  if (a === 'all' || b === 'all')
+    return a === b
+  if (a.length !== b.length)
+    return false
+  const set = new Set(a)
+  return b.every(x => set.has(x))
+}
+
+const filterDirty = computed(() =>
+  draftFilter.value.filterMode !== settings.value.filterMode
+  || draftFilter.value.selectedPresetIndex !== settings.value.selectedPresetIndex
+  || !shownUnitsEqual(draftFilter.value.shownUnitsCustom, settings.value.shownUnitsCustom),
+)
 
 async function refreshStatus() {
   const s = await bridge.status()
@@ -70,7 +111,7 @@ onBeforeUnmount(() => {
   browser.tabs.onActivated.removeListener(onTabActivated)
 })
 
-async function apply() {
+async function sendApply(opts: { source: 'instant' | 'filter' }) {
   await save()
   const r = await bridge.apply({
     enabled: settings.value.enabled,
@@ -80,7 +121,7 @@ async function apply() {
     showIndicators: settings.value.showIndicators,
     enabledCrateTypes: settings.value.enabledCrateTypes,
     fontSize: settings.value.fontSize,
-    shownUnits: effectiveShownUnits.value,
+    shownUnits: appliedShownUnits.value,
   })
   if (r.ok) {
     const active
@@ -97,17 +138,45 @@ async function apply() {
         : undefined
     lastApplied.value = {
       mode: settings.value.filterMode,
-      shownUnits: effectiveShownUnits.value,
+      shownUnits: appliedShownUnits.value,
       total: snap ? snap.totalCount : totalCount.value,
       snapshotName: snap?.name,
     }
-    toast.show('ok', settings.value.enabled ? '已套用' : '已停用')
+    if (opts.source === 'filter')
+      toast.show('ok', settings.value.enabled ? '已套用篩選' : '已停用')
   }
   else {
     status.value = { kind: 'error', text: `失敗：${r.error ?? 'unknown'}` }
     toast.show('err', `套用失敗：${r.error ?? 'unknown'}`)
   }
 }
+
+async function applyFilter() {
+  settings.value.shownUnitsCustom = Array.isArray(draftFilter.value.shownUnitsCustom)
+    ? [...draftFilter.value.shownUnitsCustom]
+    : draftFilter.value.shownUnitsCustom
+  settings.value.filterMode = draftFilter.value.filterMode
+  settings.value.selectedPresetIndex = draftFilter.value.selectedPresetIndex
+  await sendApply({ source: 'filter' })
+}
+
+watch(
+  () => [
+    settings.value.enabled,
+    settings.value.showNeutral,
+    settings.value.showAlly,
+    settings.value.showEnemy,
+    settings.value.showIndicators,
+    settings.value.fontSize,
+    settings.value.enabledCrateTypes.slice(),
+  ],
+  () => {
+    if (suppressInstant)
+      return
+    sendApply({ source: 'instant' })
+  },
+  { deep: true },
+)
 </script>
 
 <template>
@@ -129,13 +198,18 @@ async function apply() {
         />
         <CrateSection v-model="settings.enabledCrateTypes" />
         <FilterSection
-          v-model:shownUnitsCustom="settings.shownUnitsCustom"
-          v-model:filterMode="settings.filterMode"
-          v-model:selectedPresetIndex="settings.selectedPresetIndex"
+          v-model:shownUnitsCustom="draftFilter.shownUnitsCustom"
+          v-model:filterMode="draftFilter.filterMode"
+          v-model:selectedPresetIndex="draftFilter.selectedPresetIndex"
           v-model:totalCount="totalCount"
         />
       </div>
-      <ApplyBar hint="變更會在 ra2web 分頁開啟時生效" @apply="apply" />
+      <ApplyBar
+        :disabled="!filterDirty"
+        :hint="filterDirty ? '單位篩選有未套用變更' : '其他設定即時生效；僅單位篩選需要套用'"
+        label="套用單位篩選"
+        @apply="applyFilter"
+      />
     </div>
     <Toast />
   </main>
