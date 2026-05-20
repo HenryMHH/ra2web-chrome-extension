@@ -8,6 +8,8 @@ export type ShownUnits = 'all' | string[]
 export interface Ra2Settings {
   enabled: boolean
   showNeutral: boolean
+  showAlly: boolean
+  showEnemy: boolean
   showIndicators: boolean
   enabledCrateTypes: number[]
   fontSize: number
@@ -19,6 +21,8 @@ export interface Ra2Settings {
 const DEFAULTS: Ra2Settings = {
   enabled: false,
   showNeutral: false,
+  showAlly: true,
+  showEnemy: true,
   showIndicators: false,
   enabledCrateTypes: [],
   fontSize: 14,
@@ -68,6 +72,8 @@ export function useRa2Settings() {
       settings.value = {
         enabled: !!raw.enabled,
         showNeutral: !!raw.showNeutral,
+        showAlly: raw.showAlly !== false,
+        showEnemy: raw.showEnemy !== false,
         showIndicators: !!raw.showIndicators,
         enabledCrateTypes,
         fontSize: typeof raw.fontSize === 'number' ? raw.fontSize : 14,
