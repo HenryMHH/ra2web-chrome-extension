@@ -5,7 +5,7 @@ import AppHeader from '../AppHeader.vue'
 describe('appHeader', () => {
   it('renders title and version', () => {
     const w = mount(AppHeader, { props: { active: false, version: '0.0.1' } })
-    expect(w.text()).toContain('RA2 Unit Display')
+    expect(w.text()).toContain('Ra2 Web Assistant')
     expect(w.text()).toContain('0.0.1')
   })
 

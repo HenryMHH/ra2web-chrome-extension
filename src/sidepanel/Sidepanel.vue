@@ -34,9 +34,11 @@ async function init() {
 init()
 
 const effectiveShownUnits = computed<'all' | string[]>(() => {
-  if (settings.value.filterMode === 'preset'
+  if (
+    settings.value.filterMode === 'preset'
     && settings.value.selectedPresetIndex >= 0
-    && snapshots.value[settings.value.selectedPresetIndex]) {
+    && snapshots.value[settings.value.selectedPresetIndex]
+  ) {
     return snapshots.value[settings.value.selectedPresetIndex].shownUnits
   }
   return settings.value.shownUnitsCustom
@@ -81,13 +83,18 @@ async function apply() {
     shownUnits: effectiveShownUnits.value,
   })
   if (r.ok) {
-    const active = settings.value.enabled || settings.value.showIndicators || settings.value.enabledCrateTypes.length > 0
+    const active
+      = settings.value.enabled
+      || settings.value.showIndicators
+      || settings.value.enabledCrateTypes.length > 0
     status.value = active
       ? { kind: 'active', text: '已套用 — 啟用中' }
       : { kind: 'ok', text: '已套用 — 未啟用' }
-    const snap = settings.value.filterMode === 'preset' && settings.value.selectedPresetIndex >= 0
-      ? snapshots.value[settings.value.selectedPresetIndex]
-      : undefined
+    const snap
+      = settings.value.filterMode === 'preset'
+      && settings.value.selectedPresetIndex >= 0
+        ? snapshots.value[settings.value.selectedPresetIndex]
+        : undefined
     lastApplied.value = {
       mode: settings.value.filterMode,
       shownUnits: effectiveShownUnits.value,
@@ -105,9 +112,11 @@ async function apply() {
 
 <template>
   <main class="bg-background min-h-screen">
-    <div class="w-[360px] mx-auto bg-card rounded-none sm:rounded-2xl border border-border overflow-hidden">
+    <div
+      class="w-full px-4 mx-auto bg-card rounded-none sm:rounded-2xl border border-border overflow-hidden"
+    >
       <AppHeader :active="status.kind === 'active'" :version="VERSION" />
-      <div class="max-h-[520px] overflow-y-auto">
+      <div class="overflow-y-auto">
         <StatusBar :kind="status.kind" :text="status.text" />
         <ActiveFilterInfo :applied="lastApplied" />
         <SettingsSection
