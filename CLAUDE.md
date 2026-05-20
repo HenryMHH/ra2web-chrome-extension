@@ -333,28 +333,59 @@ position:fixed; top:0; left:0; pointer-events:none; z-index:9999
 
 ---
 
-## 五、單位篩選 (popup-side state)
+## 五、單位篩選 (sidepanel-side state)
 
-`popup.js` 維護兩種模式:
+**全面改為白名單**:儲存的是「要顯示哪些單位」,不是「要藏哪些」。舊的 `hiddenUnits` / `hiddenUnitsCustom` 鍵在 load 時被丟棄(legacy snapshot 也是),因為從黑名單反推白名單需要當時的單位清單,做不到無損遷移 —— 直接 reset 成「全部顯示」(`shownUnitsCustom === 'all'`)。
+
+`useRa2Settings.ts` 維護的 shape:
+
+```ts
+interface Ra2Settings {
+  enabled, showNeutral, showAlly, showEnemy, showIndicators: boolean
+  enabledCrateTypes: number[]
+  fontSize: number
+  shownUnitsCustom: 'all' | string[]   // 大寫 ruleName 陣列;'all' 字面值代表略過 filter
+  selectedPresetIndex: number          // -1 = 無
+  filterMode: 'custom' | 'preset'
+}
+```
+
+兩種 filterMode:
 
 | 模式 | 來源 |
 |------|------|
-| `custom` | `hiddenUnitsCustom: Set<ruleName>` — 單場自訂,checkbox 清單 |
-| `preset` | `snapshots[selectedPresetIndex].hiddenUnits` — 從 custom 儲存的快照 |
+| `custom` | `shownUnitsCustom` — 即時編輯狀態,checkbox 清單 |
+| `preset` | `snapshots[selectedPresetIndex].shownUnits` — 從 custom 儲存的快照 |
 
-`getEffectiveHiddenUnits()` 在套用時根據當前 `filterMode` 回傳 list,寫進 `chrome.storage` 的 `hiddenUnits` 欄位,再透過 `apply` 指令傳給 injected.js。
+`Sidepanel.vue` 的 `appliedShownUnits` computed 根據 `filterMode` 選來源,送進 `apply()` 時走 `shownUnits` 欄位(注意:injected 側欄位名是 `shownUnits`,popup 側保留 `shownUnitsCustom` 作 draft;`Sidepanel.vue:64-73`)。
 
-單位清單來源(`getUnitNames` 指令):
-1. 優先用 `state.strings.data`(完整字典),抓 `name:` 開頭的 key
-2. fallback 用 `state.discoveredUnits`(從 `create3DObject` patch 累積)
-3. 都沒有 → 提示「進入對局後單位清單才會出現」
+### Draft / commit 模型
 
-排序:依 displayName,locale `zh-Hant`。
+篩選變更不會即時 apply。`Sidepanel.vue` 維護 `draftFilter`(`shownUnitsCustom`、`filterMode`、`selectedPresetIndex`),只有按下 **套用單位篩選** (`ApplyBar`)才會把 draft 寫回 `settings`、save、send `apply`。`filterDirty` computed 控制按鈕 enable;`CheckAnimation` 在 success 時短暫疊一個打勾動畫上去(`APPLY_SUCCESS_MS = 1600`)。
 
-Snapshots 儲存在獨立 key `ra2NamesSnapshots`(陣列),每筆:
-```js
-{ name: '<input> <ISO timestamp>', hiddenUnits: [...], totalCount: number }
+其他開關(enabled / showAlly / showEnemy / showNeutral / showIndicators / fontSize / enabledCrateTypes)走「instant」路徑 —— `watch` 偵測變化直接 send `apply`,不需要按鈕(`Sidepanel.vue:169-185`)。`suppressInstant` 旗標在 `init` 階段擋掉 mount 那次 watcher 觸發,避免一打開 sidepanel 就 apply 一次。
+
+### 單位清單來源(`getUnitNames` 指令)
+
+優先序見 `src/injectedScripts/rules/enumerate.ts`:
+
+1. **`runtime.gameRef.rules` 的 `{infantry,vehicle,aircraft,building}Rules` Map** — 當局實際載入的規則,key 已是 `rules.name`,值由 `runtime.strings.get(rule.uiName)` 解析。`UnitRow` 第三欄帶 `objectType` 給 UI 分群。
+2. **`tracking.discoveredUnits`** — 從 `PipOverlay.create3DObject` patch 累積的當局實際出場單位。
+3. **`runtime.strings.data` 的 `name:*` keys** — i18n 字典 fallback,bundle 內固定;多個 rule 共享同一 `uiName` 時會合併。
+
+回傳 `{ units: UnitRow[], source: 'rules' | 'discovered' | 'strings' | 'none' }`。`Sidepanel` 透過 `totalCount` 顯示「已顯示/總數」並驅動 `ActiveFilterInfo`。
+
+排序統一依 displayName,locale `zh-Hant`。
+
+### Snapshots
+
+儲存在 `ra2NamesSnapshots` key,每筆:
+
+```ts
+interface Snapshot { name: string; shownUnits: 'all' | string[]; totalCount: number }
 ```
+
+`useRa2Snapshots.ts:38-58` load 時過濾掉舊 shape(`hiddenUnits` 欄位)並 console.info 告知 dropped 數量,再覆寫 storage —— **單向遷移**,沒有相容回退。
 
 ---
 
