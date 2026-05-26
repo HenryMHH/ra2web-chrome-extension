@@ -22,3 +22,7 @@ node_modules
 src/auto-imports.d.ts
 src/components.d.ts
 .eslintcache
+
+# Game bundle dumps kept locally for reverse-engineering reference; not part of the extension.
+ra2web.min.js
+werhd.min.js

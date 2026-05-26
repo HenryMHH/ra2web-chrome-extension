@@ -9,6 +9,16 @@ export const RA2_MATCHES = [
   'https://chronodivide.com/*',
   'https://*.ra2web.com/*',
   'https://ra2web.com/*',
+  'https://*.wangerhuoda.cn/*',
+  'https://wangerhuoda.cn/*',
+] as const
+
+// Hosts whose bundle is Vite-packed (frozen module namespaces, no SystemJS).
+// The early sniff content script is only attached on these so ra2web/chronodivide
+// keep the lightweight SystemJS path.
+export const VITE_HOST_MATCHES = [
+  'https://*.wangerhuoda.cn/*',
+  'https://wangerhuoda.cn/*',
 ] as const
 
 export async function getManifest() {
@@ -58,6 +68,16 @@ export async function getManifest() {
         run_at: 'document_idle',
         all_frames: true,
       },
+      // Early sniff: must run before the page bundle executes so we can hook
+      // Object.freeze and capture sealed module namespaces. MAIN world only,
+      // document_start, and restricted to Vite-bundled hosts.
+      {
+        matches: VITE_HOST_MATCHES as unknown as string[],
+        js: ['dist/earlySniff/index.global.js'],
+        run_at: 'document_start',
+        all_frames: true,
+        world: 'MAIN',
+      } as any,
     ],
     web_accessible_resources: [
       {
