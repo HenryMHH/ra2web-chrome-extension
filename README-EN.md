@@ -1,9 +1,8 @@
 # RA2 Web Assistant [[zh-TW](https://github.com/HenryMHH/ra2web-chrome-extension/blob/main/README.md)] [[CN](https://github.com/HenryMHH/ra2web-chrome-extension/blob/main/README-CN.md)]
 
-
 A Chrome extension for the Red Alert 2 web port — makes Chrono Divide / ra2web easier to read and play.
 
-Supported site: `https://game.ra2web.com`.
+Supported site: `https://game.ra2web.com`, `https://staging.wangerhuoda.cn/`, `https://game.chronodivide.com/`.
 
 ## Install & Use
 
@@ -15,7 +14,7 @@ Once in-game, click the extension icon in the toolbar to open the settings panel
 
 ## Demo
 
-https://github.com/user-attachments/assets/d0277982-acde-4cdc-8060-2a64dd7a5eeb
+<https://github.com/user-attachments/assets/d0277982-acde-4cdc-8060-2a64dd7a5eeb>
 
 ## Features
 

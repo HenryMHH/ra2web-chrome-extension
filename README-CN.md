@@ -2,7 +2,7 @@
 
 红色警戒 2 网页版的 Chrome 扩展,让你打 Chrono Divide / ra2web 的时候看得更清楚、玩得更轻松。
 
-支持网站:`https://game.ra2web.com`。
+支持网站: `https://game.ra2web.com`, `https://staging.wangerhuoda.cn/`, `https://game.chronodivide.com/`。
 
 ## 安装与使用
 
@@ -14,7 +14,7 @@
 
 ## 游戏展示
 
-https://github.com/user-attachments/assets/d0277982-acde-4cdc-8060-2a64dd7a5eeb
+<https://github.com/user-attachments/assets/d0277982-acde-4cdc-8060-2a64dd7a5eeb>
 
 ## 功能
 

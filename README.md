@@ -2,7 +2,7 @@
 
 紅色警戒 2 網頁版的 Chrome 擴充套件,讓你打 Chrono Divide / ra2web 的時候看得更清楚、玩得更輕鬆。
 
-支援網站:`https://game.ra2web.com`。
+支援網站:`https://game.ra2web.com`, `https://staging.wangerhuoda.cn/`, `https://game.chronodivide.com/`。
 
 ## 安裝與使用
 
@@ -14,7 +14,7 @@
 
 ## 遊戲展示
 
-https://github.com/user-attachments/assets/d0277982-acde-4cdc-8060-2a64dd7a5eeb
+<https://github.com/user-attachments/assets/d0277982-acde-4cdc-8060-2a64dd7a5eeb>
 
 ## 功能
 
