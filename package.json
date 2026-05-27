@@ -1,7 +1,7 @@
 {
   "name": "vitesse-webext",
   "displayName": "Ra2Web Assistant",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
   "packageManager": "pnpm@9.7.1",
   "description": "Just a Ra2Web chrome extension",
