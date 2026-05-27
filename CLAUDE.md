@@ -12,16 +12,27 @@
 
 來源檔案:`ra2web.min.js`,~4.2MB / ~9.6 萬行 minified JS。
 
+支援的網站變體:
+
+| 變體 | host | bundle | 引擎版本 |
+|------|------|--------|----------|
+| **ra2web / Chrono Divide** | `ra2web.com` / `chronodivide.com` 系列 | `ra2web.min.js`(SystemJS) | `0.82.0` |
+| **werhd** | `wangerhuoda.cn` 系列 | `werhd.min.js`(Vite IIFE) | `0.82.8-r702f21e` |
+
+同遊戲引擎(同 class 名、同 prototype 方法、同 `window.CdApi` 公開 API、同 `window.THREE` r94),不同 bundler。werhd 路徑見 Section 十。
+
 ### 執行期依賴版本
 
 | 依賴 | 版本 | 備註 |
 |------|------|------|
 | three.js | **~r94 (v0.94, 2018-06)** | `Matrix4` 只有 `getInverse(m)`,**沒有** `.invert()`。`.invert()` 是 r123(2021-01)才加;`getInverse` 在 r147(2022-09)被移除。寫任何 THREE API 之前都要先確認 r94 有沒有,或用 feature-detect。|
-| SystemJS | `System.register` 形式 | 保留完整模組名,所以即使 minified 也能 `System.import('engine/...')` 拿到。|
+| 模組載入 | `System.register` / Vite IIFE | ra2web 走 SystemJS(`System.import('engine/...')` 可直接拿模組);werhd 走 Vite,namespace 被 `Object.freeze` 鎖在 IIFE scope 內,要在 `document_start` 攔 `Object.freeze` 拿 class ref。dispatch 由 `location.hostname` 決定,見 Section 十。|
 
 ---
 
 ## 一、原始碼分析
+
+> 本節描述 ra2web (SystemJS) bundle 的結構。werhd (Vite) bundle 的內部 class 名 / prototype shape 一致,但模組存取方式完全不同,見 Section 十。
 
 ### 模組系統
 
@@ -113,6 +124,8 @@ go.isDestroyed                    // 已死亡
 ---
 
 ## 二、注入策略
+
+> 以下描述 SystemJS 路徑(ra2web)。werhd (Vite) 用獨立的 `document_start` MAIN-world 入口攔 `Object.freeze`,流程不同,見 Section 十。Dispatch 在 `src/injectedScripts/system/loader.ts`,依 hostname 選 SystemJS 或 Vite loader。
 
 ### 為什麼用 `System.import` 而非 wrap `System.register`
 
@@ -395,7 +408,7 @@ interface Snapshot { name: string; shownUnits: 'all' | string[]; totalCount: num
 
 ```
 src/
-├── manifest.ts                      # 動態產 manifest.json;RA2_MATCHES 常數集中 host pattern
+├── manifest.ts                      # 動態產 manifest.json;RA2_MATCHES + VITE_HOST_MATCHES host pattern
 ├── background/
 │   ├── main.ts                      # service worker:setIcon listener + tab url 監聽
 │   └── contentScriptHMR.ts          # dev-only HMR injection
@@ -403,17 +416,24 @@ src/
 │   ├── index.ts                     # isolated world：注入 + auto-apply + webext-bridge 中繼
 │   ├── views/App.vue                # 內容腳本內掛載的 Vue 元件(若有用)
 │   └── utils/{dom,pageBridge}.ts    # injectScript + pageCmd promise wrapper
+├── earlySniff/                      # ★ document_start MAIN-world 入口,只 attach 到 Vite host
+│   └── index.ts                     # hook Object.freeze + stash 到 window.__ra2_runtime + dispatch ra2-runtime-ready
 ├── injectedScripts/
 │   ├── index.ts                     # IIFE 入口
 │   ├── types.ts                     # Team / ApplyOpts / LabelCache / PipOverlayLike
 │   ├── state/                       # settings / runtime / tracking / overlay / log
-│   ├── system/                      # loader (System.import + CrateGeneratorTrait patch) + three-compat
+│   ├── system/                      # loader 依 hostname dispatch → SystemJS / Vite + 共用 CrateGen patch + three-compat
+│   │   ├── loader.ts                # 入口 + isViteHost + VITE_HOST_SUFFIXES dispatch
+│   │   ├── loader-systemjs.ts       # ra2web / chronodivide:System.import 路徑
+│   │   ├── loader-vite.ts           # werhd:讀 window.__ra2_runtime,等 ra2-runtime-ready event,10s timeout
+│   │   ├── patch-crate-trait.ts     # 兩 loader 共用的 CrateGeneratorTrait prototype hook
+│   │   └── three-compat.ts          # r94 feature-detect helpers
 │   ├── pip/                         # resolvers + PipOverlay.prototype patch
 │   ├── label/                       # build / policy / lifecycle / sweep
 │   ├── overlay/                     # canvas / indicators / crates / draw RAF
 │   ├── rules/enumerate.ts           # enumerateRulesUnits + getUnitNames
 │   ├── bridge/                      # commands(apply / status / getUnitNames) + window.postMessage
-│   └── __tests__/                   # vitest: resolvers / policy / policy.faction / three-compat / enumerate
+│   └── __tests__/                   # vitest: resolvers / policy / policy.faction / three-compat / enumerate / loader-dispatch
 ├── sidepanel/                       # 主 UI(取代舊 popup/)
 │   ├── Sidepanel.vue                # 組合所有區塊 + draft/commit logic
 │   ├── main.ts / index.html
@@ -459,12 +479,12 @@ src/
 
 extension/                           # build 產物(勿手動編輯)
 ├── manifest.json                    # 由 src/manifest.ts 產生
-└── dist/{background,contentScripts,injectedScripts,sidepanel,options}/...
+└── dist/{background,contentScripts,earlySniff,injectedScripts,sidepanel,options}/...
 ```
 
 ### Vite 多入口
 
-四個獨立 config:`vite.config.mts`(sidepanel + options)、`vite.config.background.mts`、`vite.config.content.mts`、`vite.config.injected.mts`。Inject script 必須以 IIFE bundle 輸出才能直接塞進 `<script>` 注入到 MAIN world。
+五個獨立 config:`vite.config.mts`(sidepanel + options)、`vite.config.background.mts`、`vite.config.content.mts`、`vite.config.injected.mts`、`vite.config.early.mts`(earlySniff,只給 Vite host)。Inject 類 script(`injectedScripts` / `earlySniff`)必須以 IIFE bundle 輸出才能在 MAIN world 直接執行 / 注入。
 
 ### 通訊架構
 
@@ -480,6 +500,7 @@ content script 收到 injected 發出的 `{__ra2names:'ready'}` 後,自動讀 `c
 - **sidepanel**:存得到 `chrome.storage`,送得到 `chrome.tabs.sendMessage`,但不在 page world
 - **content script**(isolated world):跟 sidepanel 通訊用 webext-bridge,但看不到 page 的 `System` / `THREE`
 - **injected script**(MAIN world):看得到 page globals,但用不到 `chrome.*`
+- **earlySniff**(MAIN world,document_start,**僅 Vite host**):必須在 page bundle 跑之前 attach,才來得及攔 `Object.freeze`。見 Section 十。
 - **background**:`chrome.action.setIcon` 在 service worker 比較穩,且 sidepanel 關閉時 content script 也能觸發
 
 ### 指令協定
@@ -512,13 +533,18 @@ content script ↔ injected script:`window.postMessage` 每筆帶 `id` / 3 秒 t
     "https://game.chronodivide.com/*",
     "https://chronodivide.com/*",
     "https://*.ra2web.com/*",
-    "https://ra2web.com/*"
+    "https://ra2web.com/*",
+    "https://*.wangerhuoda.cn/*",
+    "https://wangerhuoda.cn/*"
   ],
   "options_ui": { "page": "dist/options/index.html", "open_in_tab": true },
   "background": { "service_worker": "dist/background/index.mjs" },
   "side_panel": { "default_path": "dist/sidepanel/index.html" },      // Chromium
   "sidebar_action": { "default_panel": "dist/sidepanel/index.html" }, // Firefox
-  "content_scripts": [{ "matches": RA2_MATCHES, "js": ["dist/contentScripts/index.global.js"], "run_at": "document_idle", "all_frames": true }],
+  "content_scripts": [
+    { "matches": RA2_MATCHES,        "js": ["dist/contentScripts/index.global.js"], "run_at": "document_idle",  "all_frames": true },
+    { "matches": VITE_HOST_MATCHES,  "js": ["dist/earlySniff/index.global.js"],     "run_at": "document_start", "all_frames": true, "world": "MAIN" }
+  ],
   "web_accessible_resources": [{
     "resources": ["dist/contentScripts/style.css", "dist/injectedScripts/index.global.js"],
     "matches": RA2_MATCHES
@@ -527,7 +553,9 @@ content script ↔ injected script:`window.postMessage` 每筆帶 `id` / 3 秒 t
 }
 ```
 
-host pattern apex (`ra2web.com`) 和子網域 (`*.ra2web.com`) 必須分開列 —— MV3 match pattern 的 `*.` 不涵蓋裸網域。
+host pattern apex (`ra2web.com` / `wangerhuoda.cn`) 和子網域 (`*.ra2web.com` / `*.wangerhuoda.cn`) 必須分開列 —— MV3 match pattern 的 `*.` 不涵蓋裸網域。
+
+`VITE_HOST_MATCHES` 是 `RA2_MATCHES` 的子集(目前只有 `wangerhuoda.cn` apex + wildcard),用於那條 `world: "MAIN"` + `document_start` 的 earlySniff entry,確保 freeze hook 不會 attach 到 SystemJS host。`world: "MAIN"` 需要 Chrome 102+,Firefox 128+。`earlySniff` 不走 `web_accessible_resources` —— `world: "MAIN"` content script 是 manifest 靜態載入,不是 page 自取資源。
 
 ---
 
@@ -615,6 +643,14 @@ host pattern apex (`ra2web.com`) 和子網域 (`*.ra2web.com`) 必須分開列 �
 18. **`shownUnits` 同名但兩端不同型別** — sidepanel 持久化的是 `shownUnitsCustom: 'all' | string[]`(JSON 友善),injected 執行期持有的是 `settings.shownUnits: 'all' | Set<string>`(查詢 O(1))。轉換在 `bridge/commands.ts:29-37`(injected 收)和 `Sidepanel.vue` `appliedShownUnits` computed(sidepanel 送)兩處發生 —— 改 schema 時兩邊都要動,且 content script 的 auto-apply 路徑會做 `shownUnits: s.shownUnitsCustom ?? 'all'` 的 alias(`contentScripts/index.ts:31`),也要一起改。
 19. **per-faction toggle 預設 `true`** — 新增 `showAlly` / `showEnemy` 時,預設值若用 `false` 會讓既有使用者升級後突然看不到大半 label。`normalizeSettings` 用 `raw.showAlly !== false`(預設 true,只有顯式 false 才關)和 settings.ts 的初始值 `true` 共同保證 forward-compat。
 
+20. **Vite bundle 沒有公開的模組 entry** — `System.import` 在 werhd 上不存在,所有 module namespace 都被 `Object.freeze(Object.defineProperty({...}, Symbol.toStringTag, { value: 'Module' }))` 鎖在 IIFE scope 內、外部無路。解法:`document_start` + `world: "MAIN"` 攔 `Object.freeze`,自己讀 namespace 後 stash。詳見 Section 十。content_script 預設的 `document_idle` 太晚,bundle 早就 freeze 完了。
+
+21. **dispatch 用 hostname 而非 `'systemjs' | 'vite'` enum** — 我們選 loader 的依據是 host(`location.hostname`),不是 bundler 種類。bundler 是 host 內部實作細節,將來若再有第三個變體用第三種 bundler,還是看 host 加 suffix。用 enum 會把 host 跟 bundler 偽 1:1 綁死,讓 dispatch 表演技條件混淆。`VITE_HOST_SUFFIXES` 在 `loader.ts` 內,manifest 那邊有相應的 `VITE_HOST_MATCHES`(順序耦合,改一個記得改另一個)。
+
+22. **`endsWith` 的 suffix-trick** — `isViteHost('attacker-wangerhuoda.cn')` 應為 false。寫成 `hostname.endsWith(h)` 會誤命中,必須是 `hostname === h || hostname.endsWith('.' + h)`(加前導點)。`loader-dispatch.test.ts` lock 這個 case。
+
+23. **freeze hook 的 duck-type 驗證不能省** — namespace 含 `PipOverlay` getter 的模組不見得只有一個(re-export / barrel)。直接用 export key 字串命中第一個會冒風險。每個 slot 對應一支 fingerprint:`PipOverlay.prototype.create3DObject`、`CrateGeneratorTrait.prototype.{init,spawnCrateAt}`、`CanvasUtils.drawText`、`SpriteUtils.createSpriteGeometry`、`Coords.tile3dToWorld`。版本升級時這些 method 名若變,validator 抓不到 → loader-vite 10s timeout → apply 回 "modules not available"。
+
 ---
 
 ## 九、可擴充方向
@@ -626,3 +662,168 @@ host pattern apex (`ra2web.com`) 和子網域 (`*.ra2web.com`) 必須分開列 �
 - 多語系(目前 sidepanel 字串硬編 zh-Hant)
 - 匯入/匯出 snapshots(JSON 檔)
 - 篩選依「類型」(infantry / vehicle / building / aircraft)而非個別 ruleName
+
+---
+
+## 十、Vite bundle 變體(werhd)支援
+
+### 背景
+
+`staging.wangerhuoda.cn` 及子域提供 ra2 復刻版的另一個變體(代號 werhd)。同遊戲引擎(同 class 名、同 prototype 方法、同 `window.CdApi`、同 `window.THREE` r94),但 bundle 用 **Vite IIFE** 包,不是 SystemJS。引擎版本 `0.82.8-r702f21e`(ra2web 同代是 `0.82.0`)。
+
+### 兩 bundle 比對
+
+| 維度 | ra2web / chronodivide | werhd / wangerhuoda |
+|---|---|---|
+| 打包器 | SystemJS `System.register` | Vite IIFE |
+| 模組存取 | `System.import('engine/...')` 公開 | namespace 凍結在 IIFE scope 內,**外部無 entry** |
+| 引擎版本 | `0.82.0` | `0.82.8-r702f21e` |
+| `window.THREE` | r94 | r94 |
+| `window.CdApi` | ✅(只 expose battleControl / replay,不含 engine internals) | ✅ |
+| `PipOverlay` constructor args | 較少 | 18 個(多 `selectionModel` / `flyerHelperOpt` / `hiddenObjectsOpt` / `debugTextEnabled` / `animFactory` / `useSpriteBatching` / `useMeshInstancing` / `persistentHoverTags` / `mapRenderable`) |
+| instance 屬性 | `this.gameObject/viewer/alliances/camera/strings` | 同(屬性名一致;werhd 多了 `this.selectionModel` 等但 patch 不碰) |
+| `this.viewer.value` 仍用 | ✅ | ✅(`resolveTeam` 不用改) |
+
+constructor 雖增參,但我們只 patch `prototype.{create3DObject,update,dispose}`,不重新 construct,所以 patch 邏輯共用。
+
+### 為什麼需要 freeze hook
+
+Vite 把每個 module namespace 包成:
+
+```js
+const SXe = Object.freeze(Object.defineProperty({
+  __proto__: null,
+  get PipOverlay() { return fXe }
+}, Symbol.toStringTag, { value: "Module" }));
+```
+
+namespace 變數(`SXe`、`fXe` 等)是 IIFE scope 內 `let`,**外部完全拿不到**。也沒 SystemJS 那種 `System.import(name)` 公開 entry。`window.CdApi` 只 expose battle control / replay 那一層,沒掛 engine internals;`window.r`(DevTools API)只給 `reset`/`help`/`version` 那幾個 command,沒 game state。
+
+唯一可行的路:**在 bundle 跑之前 hook `Object.freeze`**,等 bundle 自己凍 namespace 時攔下來、duck-type 驗證後拿 class ref 出來 stash。
+
+### document_start + MAIN world
+
+content_script 預設 `document_idle` + isolated world,**兩個都不對**:
+- `document_idle`:bundle 已 run 完、freeze 都凍完了,hook 沒意義
+- isolated world:看不到 page 的 `Object.freeze`
+
+MV3 支援在 manifest 直接宣告 `"run_at": "document_start"` + `"world": "MAIN"`(Chrome 102+ / Firefox 128+)。`src/earlySniff/index.ts` 走這條路。
+
+### 入口分工
+
+| entry | run_at | world | matches | 任務 |
+|---|---|---|---|---|
+| `dist/contentScripts/index.global.js` | document_idle | isolated | `RA2_MATCHES`(全部 host) | webext-bridge / 注入 `injectedScripts` / auto-apply |
+| `dist/earlySniff/index.global.js` | document_start | **MAIN** | `VITE_HOST_MATCHES`(只 wangerhuoda.cn) | freeze hook + class sniff |
+| `dist/injectedScripts/index.global.js` | (由 contentScript 注入 `<script>`) | MAIN | — | label / overlay / patch / bridge |
+
+`earlySniff` 與 `injectedScripts` 兩個 MAIN-world entry 共用同一個 `window`,stash 透過 `window.__ra2_runtime` 傳遞,並 dispatch `ra2-runtime-ready` event 通知。
+
+### freeze hook 細節
+
+`src/earlySniff/index.ts`:
+
+```ts
+const origFreeze = Object.freeze
+Object.freeze = function freezeHook(obj) {
+  if (obj?.[Symbol.toStringTag] === 'Module') {
+    // 對 PipOverlay / CrateGeneratorTrait / CanvasUtils / SpriteUtils / Coords
+    // 做 duck-type 驗證後 stash 進 window.__ra2_runtime
+  }
+  return origFreeze(obj)
+}
+```
+
+驗證採嚴格 duck-type(見 Pit #23),避免同名 export 從別處先命中:
+
+| slot | fingerprint |
+|---|---|
+| `PipOverlay` | `typeof v === 'function' && typeof v.prototype.create3DObject === 'function'` |
+| `CrateGeneratorTrait` | `prototype.init` + `prototype.spawnCrateAt` |
+| `CanvasUtils` | `typeof v.drawText === 'function'` |
+| `SpriteUtils` | `typeof v.createSpriteGeometry === 'function'` |
+| `Coords` | `typeof v.tile3dToWorld === 'function'` |
+
+五個全到齊後立即還原 `Object.freeze` 並 dispatch `ra2-runtime-ready` event。30s timeout safety net 還會 unhook 一次(避免長期 perf 負擔 + 若有 slot 漏抓也不會永久 hook 住)。
+
+實際觀察 capture 順序:`Coords → CanvasUtils → CrateGeneratorTrait → SpriteUtils → PipOverlay`,反映 bundle 內部依賴拓樸順序。
+
+### loader dispatch(domain-based)
+
+`src/injectedScripts/system/loader.ts`:
+
+```ts
+export const VITE_HOST_SUFFIXES = ['wangerhuoda.cn'] as const
+
+export function isViteHost(hostname: string): boolean {
+  return VITE_HOST_SUFFIXES.some(h => hostname === h || hostname.endsWith(`.${h}`))
+}
+
+export async function loadClasses() {
+  if (runtime.PipOverlay && runtime.CanvasUtils) return true
+  return isViteHost(location.hostname) ? loadFromVite() : loadFromSystemJs()
+}
+```
+
+決策依據是 host(`location.hostname`),不是 bundler 種類。理由見 Pit #21。`isViteHost` 注意 suffix-trick,見 Pit #22;`__tests__/loader-dispatch.test.ts` lock 行為。
+
+### loader-vite 等待邏輯
+
+```ts
+async function waitForStash(timeoutMs: number) {
+  const present = readStash()
+  if (hasAll(present)) return present              // 同步路徑(大部分情況)
+  // 否則聽 ra2-runtime-ready event + setTimeout 競賽,先到先贏
+}
+```
+
+實際 timing:earlySniff 在 document_start 跑、bundle freeze 在 document_loading 中跑、injected.js 在 document_idle 由 contentScript 注入。所以 `loadFromVite` 被呼叫時 stash 多半已 ready,event listener 是 forward-compat 保險(若未來 werhd 把 freeze 延後到 idle 之後)。
+
+### 共用 CrateGeneratorTrait patch
+
+`src/injectedScripts/system/patch-crate-trait.ts` 抽共用 patch。兩個 loader 拿到 class ref 後都呼叫同一支 `patchCrateTrait(CrateGen)`。class shape 兩 bundle 同形(`prototype.init(game)` 捕 `runtime.gameRef`、`prototype.spawnCrateAt` 補捕 fallback ref + 換局清空 `discoveredUnits`)。
+
+### 加新 Vite host 的步驟
+
+1. `src/manifest.ts` 的 `VITE_HOST_MATCHES` 加 host pattern(apex + `*.` 子域兩條)
+2. `src/manifest.ts` 的 `RA2_MATCHES` 也要加(共用 host_permissions / 主 content script / WAR)
+3. `src/injectedScripts/system/loader.ts` 的 `VITE_HOST_SUFFIXES` 加 hostname(不含 protocol / `*.`)
+4. `__tests__/loader-dispatch.test.ts` 加對應 test case
+5. `web_accessible_resources` 不用改 —— `world: "MAIN"` 的 content script 不走 WAR
+
+新增 SystemJS host 只動 `RA2_MATCHES`,不需動 dispatch(fallback 路徑)。
+
+### 對 ra2web / chronodivide 的影響
+
+零變動。SystemJS 路徑(`loader-systemjs.ts`)是原 `loader.ts` 邏輯搬位置,無語意改動。manifest 第二條 content_scripts 只 match `wangerhuoda.cn`,不會 attach 到 ra2web。chronodivide 已實機驗證(`apply: labels enabled` + `unit discovered` 等 log 正常)。
+
+### 觀察驗證 log 範本
+
+werhd 開站時 console 預期序列:
+
+```
+[ra2-early] freeze hook installed (document_start, MAIN world)
+[ra2-early] captured Coords class Vl{...}
+[ra2-early] captured CanvasUtils class mF{...}
+[ra2-early] captured CrateGeneratorTrait class {...}
+[ra2-early] captured SpriteUtils yAe {...}
+[ra2-early] captured PipOverlay class Pe{...}
+[ra2-early] all targets captured — restoring Object.freeze
+[ra2-names] content script loaded
+[ra2-names] loader: vite path (host=staging.wangerhuoda.cn)
+[ra2-names] CrateGeneratorTrait patched
+[ra2-names] PipOverlay.prototype patched
+[ra2-names] injected, awaiting commands
+```
+
+chronodivide 對照組:
+
+```
+[ra2-names] content script loaded
+[ra2-names] loader: systemjs path (host=game.chronodivide.com)
+[ra2-names] injected, awaiting commands
+[ra2-names] CrateGeneratorTrait patched
+[ra2-names] PipOverlay.prototype patched
+```
+
+(loader log 順序兩邊不同 —— SystemJS 路徑同步、Vite 路徑要等 stash,但 `loadClasses` 都不 block `announceReady`,所以 systemjs 線會看到 `injected, awaiting commands` 早於 `patched` log)
