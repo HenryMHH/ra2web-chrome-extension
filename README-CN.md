@@ -6,7 +6,7 @@
 
 ## 安装与使用
 
-下载最新版本 [Ra2 Web Assitant](https://github.com/HenryMHH/ra2web-chrome-extension/releases/tag/v1.0.0) (extension.zip)
+下载最新版本 [Ra2 Web Assitant](https://github.com/HenryMHH/ra2web-chrome-extension/releases/tag/v2.0.0) (extension.zip)
 
 到 Chrome `chrome://extensions`,开启“开发者模式”,点“加载已解压的扩展程序”,选择 `extension/` 文件夹。
 

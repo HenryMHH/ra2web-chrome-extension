@@ -6,7 +6,7 @@ Supported site: `https://game.ra2web.com`, `https://staging.wangerhuoda.cn/`, `h
 
 ## Install & Use
 
-Download the latest release [Ra2 Web Assitant](https://github.com/HenryMHH/ra2web-chrome-extension/releases/tag/v1.0.0) (extension.zip).
+Download the latest release [Ra2 Web Assitant](https://github.com/HenryMHH/ra2web-chrome-extension/releases/tag/v2.0.0) (extension.zip).
 
 Go to Chrome `chrome://extensions`, enable "Developer mode", click "Load unpacked", and pick the `extension/` folder.
 
