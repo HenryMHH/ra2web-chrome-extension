@@ -26,12 +26,28 @@ export function resolveName(self: PipOverlayLike): string | null {
     if (!rules)
       return null
     const key = rules.uiName
+    let baseName: string | null = null
     if (key && self.strings && typeof self.strings.get === 'function') {
       const v = self.strings.get(key)
       if (v && v !== key)
-        return v
+        baseName = v
     }
-    return rules.name ?? null
+    if (baseName === null)
+      baseName = rules.name ?? null
+    if (baseName === null)
+      return null
+
+    const cb = self.gameObject?.crateBonuses
+    if (!cb)
+      return baseName
+    let suffix = ''
+    if (cb.firepower > 1)
+      suffix = 'P'
+    if (cb.armor > 1)
+      suffix = suffix ? `${suffix}/D` : 'D'
+    if (cb.speed > 1)
+      suffix = suffix ? `${suffix}/S` : 'S'
+    return suffix ? `${baseName}(${suffix})` : baseName
   }
   catch {
     return null
