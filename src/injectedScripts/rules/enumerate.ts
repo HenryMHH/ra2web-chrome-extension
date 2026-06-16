@@ -39,6 +39,18 @@ export function enumerateRulesUnits(): UnitRow[] | null {
   return rows
 }
 
+export function getCratePoolOrdered(): string[] {
+  const vehicleRules = runtime.gameRef?.rules?.vehicleRules
+  if (!vehicleRules || typeof vehicleRules.forEach !== 'function')
+    return []
+  const pool: string[] = []
+  vehicleRules.forEach((rule: any, ruleName: string) => {
+    if (rule?.crateGoodie)
+      pool.push(String(ruleName).toUpperCase())
+  })
+  return pool
+}
+
 export interface UnitNamesResult {
   units: UnitRow[]
   source: 'rules' | 'discovered' | 'strings' | 'none'

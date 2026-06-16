@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { enumerateRulesUnits, getUnitNames } from '../rules/enumerate'
+import { enumerateRulesUnits, getCratePoolOrdered, getUnitNames } from '../rules/enumerate'
 import { runtime } from '../state/runtime'
 import { tracking } from '../state/tracking'
 
@@ -65,5 +65,50 @@ describe('getUnitNames', () => {
     const r = getUnitNames()
     expect(r.source).toBe('strings')
     expect(r.units).toEqual([['E1', '大兵']])
+  })
+})
+
+describe('getCratePoolOrdered', () => {
+  it('returns empty array when gameRef missing', () => {
+    runtime.gameRef = null
+    expect(getCratePoolOrdered()).toEqual([])
+  })
+
+  it('returns ruleNames of crateGoodie vehicles in insertion order', () => {
+    runtime.gameRef = {
+      rules: {
+        vehicleRules: new Map([
+          ['MTNK', { crateGoodie: false }],
+          ['HTNK', { crateGoodie: true }],
+          ['LTNK', { crateGoodie: true }],
+          ['TNKD', { crateGoodie: true }],
+        ]),
+      },
+    }
+    runtime.strings = null
+    expect(getCratePoolOrdered()).toEqual(['HTNK', 'LTNK', 'TNKD'])
+  })
+
+  it('excludes vehicles with crateGoodie falsy', () => {
+    runtime.gameRef = {
+      rules: {
+        vehicleRules: new Map([
+          ['MTNK', { crateGoodie: false }],
+          ['HTNK', { crateGoodie: undefined }],
+        ]),
+      },
+    }
+    expect(getCratePoolOrdered()).toEqual([])
+  })
+
+  it('uppercases ruleName', () => {
+    runtime.gameRef = {
+      rules: {
+        vehicleRules: new Map([
+          ['mtnk', { crateGoodie: true }],
+        ]),
+      },
+    }
+    expect(getCratePoolOrdered()).toEqual(['MTNK'])
   })
 })
