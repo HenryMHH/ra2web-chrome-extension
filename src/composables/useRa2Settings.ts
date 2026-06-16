@@ -79,7 +79,12 @@ function installListener() {
   browser.storage.onChanged.addListener((changes, area) => {
     if (area !== 'local' || !changes[STORAGE_KEY])
       return
-    settings.value = normalizeSettings(changes[STORAGE_KEY].newValue)
+    const next = normalizeSettings(changes[STORAGE_KEY].newValue)
+    // Skip if semantically identical — prevents infinite apply loop when this
+    // tab's own save() triggers onChanged and re-fires the instant watcher.
+    if (JSON.stringify(next) === JSON.stringify(settings.value))
+      return
+    settings.value = next
   })
 }
 
