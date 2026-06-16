@@ -63,6 +63,83 @@ describe('resolveName', () => {
   it('returns null if no rules', () => {
     expect(resolveName(makePip({}))).toBeNull()
   })
+
+  it('appends (P) when only firepower bonus active', () => {
+    const pip = makePip({
+      gameObject: {
+        rules: { uiName: 'name:APOC', name: 'APOC' },
+        crateBonuses: { firepower: 1.5, armor: 1, speed: 1 },
+      },
+      strings: { get: (k: string) => k === 'name:APOC' ? '天啟坦克' : '' },
+    })
+    expect(resolveName(pip)).toBe('天啟坦克(P)')
+  })
+
+  it('appends (D) when only armor bonus active', () => {
+    const pip = makePip({
+      gameObject: {
+        rules: { uiName: 'name:APOC', name: 'APOC' },
+        crateBonuses: { firepower: 1, armor: 1.5, speed: 1 },
+      },
+      strings: { get: (k: string) => k === 'name:APOC' ? '天啟坦克' : '' },
+    })
+    expect(resolveName(pip)).toBe('天啟坦克(D)')
+  })
+
+  it('appends (S) when only speed bonus active', () => {
+    const pip = makePip({
+      gameObject: {
+        rules: { uiName: 'name:APOC', name: 'APOC' },
+        crateBonuses: { firepower: 1, armor: 1, speed: 1.5 },
+      },
+      strings: { get: (k: string) => k === 'name:APOC' ? '天啟坦克' : '' },
+    })
+    expect(resolveName(pip)).toBe('天啟坦克(S)')
+  })
+
+  it('appends (P/D/S) when all three bonuses active', () => {
+    const pip = makePip({
+      gameObject: {
+        rules: { uiName: 'name:APOC', name: 'APOC' },
+        crateBonuses: { firepower: 1.5, armor: 1.5, speed: 1.5 },
+      },
+      strings: { get: (k: string) => k === 'name:APOC' ? '天啟坦克' : '' },
+    })
+    expect(resolveName(pip)).toBe('天啟坦克(P/D/S)')
+  })
+
+  it('appends (P/S) when firepower and speed active but not armor', () => {
+    const pip = makePip({
+      gameObject: {
+        rules: { uiName: 'name:APOC', name: 'APOC' },
+        crateBonuses: { firepower: 1.5, armor: 1, speed: 1.5 },
+      },
+      strings: { get: (k: string) => k === 'name:APOC' ? '天啟坦克' : '' },
+    })
+    expect(resolveName(pip)).toBe('天啟坦克(P/S)')
+  })
+
+  it('returns plain name when crateBonuses absent (e.g. Building)', () => {
+    const pip = makePip({
+      gameObject: {
+        rules: { uiName: 'name:GAWEAP', name: 'GAWEAP' },
+        // no crateBonuses
+      },
+      strings: { get: (k: string) => k === 'name:GAWEAP' ? '戰神基地' : '' },
+    })
+    expect(resolveName(pip)).toBe('戰神基地')
+  })
+
+  it('returns plain name when all bonuses are exactly 1 (default)', () => {
+    const pip = makePip({
+      gameObject: {
+        rules: { uiName: 'name:APOC', name: 'APOC' },
+        crateBonuses: { firepower: 1, armor: 1, speed: 1 },
+      },
+      strings: { get: (k: string) => k === 'name:APOC' ? '天啟坦克' : '' },
+    })
+    expect(resolveName(pip)).toBe('天啟坦克')
+  })
 })
 
 describe('resolveNameFromGo', () => {
