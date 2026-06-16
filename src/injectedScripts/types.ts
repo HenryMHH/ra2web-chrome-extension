@@ -44,6 +44,7 @@ export interface PipOverlayLike {
   gameObject?: {
     rules?: { name?: string, uiName?: string }
     owner?: GameOwner
+    crateBonuses?: { firepower: number, armor: number, speed: number }
   }
   rootObj?: THREE.Object3D & { matrixWorldNeedsUpdate: boolean }
   camera?: THREE.Camera
