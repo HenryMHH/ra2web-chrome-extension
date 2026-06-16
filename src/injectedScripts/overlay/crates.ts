@@ -1,11 +1,26 @@
 import type * as THREE from 'three'
 import { runtime } from '../state/runtime'
 import { settings } from '../state/settings'
+import { getCratePoolOrdered } from '../rules/enumerate'
+import { clonePrng, predictUnitCrate } from './prng-predict'
 import { POWERUP_LABELS } from '~/constants/powerups'
 
 const LABEL_FS = 11
 const PX = 5
 const PY = 3
+const POWERUP_TYPE_UNIT = 7
+
+function resolveUnitDisplayName(ruleName: string): string {
+  try {
+    const rule = runtime.gameRef?.rules?.vehicleRules?.get(ruleName)
+    if (!rule?.uiName)
+      return ruleName
+    return runtime.strings?.get(rule.uiName) || ruleName
+  }
+  catch {
+    return ruleName
+  }
+}
 
 export function drawCrateLabels(
   ctx: CanvasRenderingContext2D,
@@ -23,14 +38,36 @@ export function drawCrateLabels(
   if (!Coords)
     return
 
+  // Compute unit prediction once per frame (same PRNG state for all unit crates)
+  let unitPredictionLabel: string | null = null
+  if (settings.enabledCrateTypes.has(POWERUP_TYPE_UNIT)) {
+    const pool = getCratePoolOrdered()
+    const prng = runtime.gameRef?.prng
+    if (pool.length > 0 && prng) {
+      const clone = clonePrng(prng)
+      const ruleName = clone ? predictUnitCrate(clone, pool) : null
+      if (ruleName)
+        unitPredictionLabel = resolveUnitDisplayName(ruleName)
+    }
+  }
+
   for (const crate of crates) {
     const obj = crate.obj
     if (!obj || !obj.tile)
       continue
     const powerupType = crate.powerup?.type
-    const label = POWERUP_LABELS[powerupType]
-    if (!label || !settings.enabledCrateTypes.has(Number(powerupType)))
+    if (!settings.enabledCrateTypes.has(Number(powerupType)))
       continue
+
+    let label: string
+    if (powerupType === POWERUP_TYPE_UNIT && unitPredictionLabel) {
+      label = unitPredictionLabel
+    }
+    else {
+      label = POWERUP_LABELS[powerupType]
+      if (!label)
+        continue
+    }
 
     let sx: number
     let sy: number
