@@ -10,6 +10,7 @@
 4. 依單位類型**過濾**要顯示哪些 label(custom / preset 兩種模式)
 5. 標籤**字體大小**可調
 6. 在玩家列表(遊戲房 / 遊戲中 / 結算)標記**玩家性質**(可靠 / 敵人 / 自私 / 新手)
+7. sidepanel **匯出 / 匯入設定檔**(設定 + 快照 + 玩家標記,JSON)
 
 來源檔案:`ra2web.min.js`,~4.2MB / ~9.6 萬行 minified JS。
 
@@ -448,6 +449,7 @@ src/
 │   │   ├── IndicatorsRow.vue        # 「畫面外敵人指標」開關
 │   │   ├── CrateSection.vue         # 寶箱 type 多選 grid
 │   │   ├── FilterSection.vue        # custom / preset 切換 + 清單 + 快照
+│   │   ├── ConfigTransferRow.vue    # 設定檔匯出/匯入列(行內確認)
 │   │   ├── ApplyBar.vue             # 篩選 commit 按鈕(含 disabled 邏輯)
 │   │   ├── CheckAnimation.vue       # ApplyBar success 用的打勾動畫
 │   │   ├── ActiveFilterInfo.vue     # 已套用 filter 摘要(模式 / 名稱 / 計數)
@@ -476,6 +478,8 @@ src/
 │   ├── storage.ts
 │   ├── tab-status.ts                # RA2 hostname 匹配 + updateIcon
 │   ├── common-setup.ts
+│   ├── configTransfer.ts            # 設定檔格式 build/parse/sanitize + storage 讀寫
+│   ├── fileIO.ts                    # Blob 下載 + FileReader 讀檔
 │   └── index.ts
 ├── styles/                          # unocss + 全域 css
 └── types/webext-bridge.d.ts         # popup↔content ProtocolMap
@@ -515,6 +519,7 @@ content script ↔ injected script:`window.postMessage` 每筆帶 `id` / 3 秒 t
 
 ### sidepanel UI
 
+- **設定檔**:匯出(下載 JSON)/ 匯入(選檔 → 行內確認 → 覆寫 → 立即 apply),位於「顯示單位名稱」上方(`SettingsSection` 的 `top` slot)
 - **顯示單位名稱**(主開關) + 副選項「自己 / 盟友 / 敵方 / 中立」 + 字級拉桿(10–20 px,1px 步進)
 - **畫面外敵人指標**獨立開關
 - **寶箱**:15 種 powerup type 多選 grid(`CrateSection`)
@@ -845,3 +850,57 @@ chronodivide 對照組:
 - Dropdown 是 body-level `position:fixed`(`menu.ts`),避開遊戲容器 overflow / z-index;outside mousedown(capture)/ Esc 關閉;同一按鈕再點 = toggle。選單開啟期間按 Esc 會 `e.stopPropagation()` + `e.preventDefault()` 後才 `closeTagMenu()`,避免同一個 Esc 又被遊戲收到(例如把外交畫面也關掉);這個 keydown listener 只在選單開啟時掛著,選單關閉後 Esc 不受影響。
 - Storage `ra2PlayerTags`:`Record<玩家名(trim), 'reliable'|'enemy'|'selfish'|'newbie'>`,寫入一律 read-modify-write(`all_frames` 下可能多實例)。`onTagsChanged` 讓跨畫面 / 跨分頁即時同步。tag map 一律用 `Object.create(null)` 建構(`normalizeTagMap` / `cloneTagMap`),避免名字剛好是 `constructor`/`toString` 等 `Object.prototype` 成員時查詢誤命中,也讓名字是 `__proto__` 的玩家能正常寫入(一般物件對 `__proto__` 這個 key 走的是 setter,不是一般屬性賦值)。
 - 限制:名稱為 key,跨伺服器同名視為同一人;`stopPropagation` 只擋冒泡,遊戲若在 capture phase 攔事件仍會收到。
+
+---
+
+## 十二、設定檔匯出 / 匯入
+
+### 檔案格式(v1)
+
+`src/logic/configTransfer.ts` 定義。JSON,三個 section 皆為 optional(存在才代表要匯入該 section):
+
+```json
+{
+  "format": "ra2web-assistant-config",
+  "version": 1,
+  "exportedAt": "2026-09-27T12:00:00.000Z",
+  "data": {
+    "settings": { "...": "Ra2Settings" },
+    "snapshots": [{ "name": "...", "shownUnits": "all", "totalCount": 0 }],
+    "playerTags": { "玩家名": "reliable" }
+  }
+}
+```
+
+`format` 必須精確等於 `CONFIG_FILE_FORMAT`(`'ra2web-assistant-config'`),否則整檔拒絕(`NOT_CONFIG` 錯誤)。檔名由 `configFileName(now)` 產生:`ra2web-assistant-config-YYYYMMDD-HHmm.json`。
+
+### Section 覆寫語意
+
+`ConfigData` 三個欄位(`settings` / `snapshots` / `playerTags`)各自獨立:`parseConfigFile` 只在 JSON 的 `data` 裡**有**該 key 時才填入回傳的 `data` 並把 `ImportSummary` 對應欄位設為非空(`settings: true` / `snapshotCount`、`playerTagCount` 為數字);沒有該 key 就整個略過。`confirmImport` → `writeConfigToStorage` 也照這個「有才覆寫」規則逐欄寫入 `browser.storage.local`,檔案裡沒有的 section 完全不動既有 storage。`ImportSummary` 同時驅動 `ConfigTransferRow.vue` 的行內確認文字(「將覆寫目前的:設定、N 個快照、N 個玩家標記」)。
+
+### Sanitize 規則
+
+匯入(`parseConfigFile`)與讀 storage 匯出(`readConfigFromStorage`)共用同一套 sanitize,確保匯出的檔案本身也是「乾淨」的:
+
+- **settings**:先過 `normalizeSettings`(既有的 legacy migration / 預設值邏輯),再夾字級 `fontSize` 到 10–20 並四捨五入,`enabledCrateTypes` 過濾成只保留 `CRATE_TYPES` 白名單內的數字 id(`Set` 去重)
+- **snapshots**:逐筆驗證,不是 plain object、缺 `shownUnits`、`name` 不是非空字串就整筆丟棄(不是整檔失敗);`shownUnits` 過 `normalizeShown`,`totalCount` 非有限數字或負數時 fallback 為 `0`
+- **playerTags**:過 `normalizeTagMap`(`~/contentScripts/playerTags/store`,見第十一節)還原 `Object.create(null)` 不變式
+- **檔案大小**:`text.length`(UTF-16 code unit 數,約 1 MB)超過 `MAX_CONFIG_FILE_BYTES`(`1_000_000`)直接拒絕,不解析 JSON
+
+### 版本規則
+
+`version` 是數字,`root.version > CONFIG_FILE_VERSION`(目前 `1`)時拒絕匯入並提示「請先更新擴充功能」。等於或小於目前版本才繼續 parse——目前只有 v1,尚未有舊版轉換邏輯;未來若 schema 有不相容變更,升版號並在 `parseConfigFile` 內加對應的舊版轉換分支(見文末提醒)。
+
+### `suppressInstant` + 單次 apply
+
+`Sidepanel.vue` 的 `confirmImport()` 在寫入前把 `suppressInstant = true`,依序 `writeConfigToStorage(data)` → `reloadFromStorage()`(重新 `load()` + `loadSnapshots()`,並重跑「clamp `selectedPresetIndex`」邏輯、同步 `draftFilter`)→ `nextTick()` 才把 `suppressInstant` 放回 `false`。這是因為 `settings` / `snapshots` / `enabledCrateTypes` 等欄位在 `reloadFromStorage` 內會被逐一重新賦值,若不擋著,原本掛在這些欄位上的 instant-apply `watch`(`Sidepanel.vue:259-275`)會在還原過程中被連續觸發好幾次;擋住之後,匯入流程結尾只手動呼叫一次 `sendApply({ source: 'instant' })`,確保「匯入 → 立即 apply」只送一筆 `apply` command,不是欄位數量筆。
+
+**額外細節(比原計畫多一步)**:`confirmImport` 在 `writeConfigToStorage` **之前**,若匯入的 `data.settings` 存在,會先把它的 `selectedPresetIndex` 依「匯入後即將存在的快照數」(`data.snapshots ?? snapshots.value`,以匯入檔本身的快照為準,檔案沒帶 snapshots 才 fallback 現有的)夾到 `-1`(若原本的 index 超出範圍)。這一步刻意搬到寫入 storage 之前,而不是留給 `reloadFromStorage` 事後夾:若寫進 storage 的還是未夾過的原始值,`browser.storage.onChanged` 對這次寫入的回呼(在其他分頁/`useRa2Settings` 內的 listener)會在 `suppressInstant` 已經放回 `false` 之後才到達,拿到的又是「與目前記憶體內已夾過的 `settings.value` 不 JSON-相等」的舊值,`useRa2Settings` 的 listener 就會用這筆 echo 覆寫回未夾過的 `settings.value`——等於讓 clamp 被打回原形,還會多觸發一次不受 `suppressInstant`保護的 instant apply。先夾好再寫,確保每一筆 `storage.onChanged` echo 都和記憶體內的 settings JSON-相等,listener 直接 no-op。
+
+### 未提交 draft 不匯出
+
+`exportConfig()` 呼叫 `readConfigFromStorage()`,直接讀 `browser.storage.local`,**不是**讀 sidepanel 記憶體中的 `settings.value` 或 `draftFilter.value`。所以若使用者在 `FilterSection` 改了 checkbox 但還沒按 `ApplyBar` 的「套用單位篩選」(draft 尚未 commit,見第五節 draft/commit 模型),匯出的檔案裡不會包含這些未提交的變更——匯出的永遠是上一次實際落盤的設定。
+
+### Schema 變更的連動
+
+**新增 storage key,或改動 `Ra2Settings` / `Snapshot` / `PlayerTagMap` 的 schema 時,`configTransfer.ts` 的 `CONFIG_STORAGE_KEYS` 與對應的 sanitize 函式(`sanitizeSettings` / `sanitizeSnapshots` / `normalizeTagMap`)要一起改;若變更不相容(舊檔案匯入會產生錯誤資料而非單純缺欄位),必須升 `CONFIG_FILE_VERSION` 並在 `parseConfigFile` 內加對應的舊版轉換,不能只加欄位就當作向下相容。**
