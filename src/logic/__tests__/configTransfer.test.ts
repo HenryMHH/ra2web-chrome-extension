@@ -161,6 +161,15 @@ describe('parseConfigFile — sanitizes', () => {
     expect(parseConfigFile(wrap({ settings: 'x' }))).toEqual({ ok: false, error: '設定檔格式錯誤:settings' })
   })
 
+  it('normalizes selectedPresetIndex to an integer >= -1', () => {
+    const r1 = parseConfigFile(wrap({ settings: { selectedPresetIndex: 0.5 } }))
+    expect(r1.ok && r1.data.settings!.selectedPresetIndex).toBe(-1)
+    const r2 = parseConfigFile(wrap({ settings: { selectedPresetIndex: -7 } }))
+    expect(r2.ok && r2.data.settings!.selectedPresetIndex).toBe(-1)
+    const r3 = parseConfigFile(wrap({ settings: { selectedPresetIndex: 2 } }))
+    expect(r3.ok && r3.data.settings!.selectedPresetIndex).toBe(2)
+  })
+
   it('drops invalid snapshots, normalizes shownUnits, defaults totalCount', () => {
     const r = parseConfigFile(wrap({
       snapshots: [
@@ -196,6 +205,21 @@ describe('parseConfigFile — sanitizes', () => {
 
   it('rejects playerTags section that is not a plain object', () => {
     expect(parseConfigFile(wrap({ playerTags: [] }))).toEqual({ ok: false, error: '設定檔格式錯誤:playerTags' })
+  })
+
+  it('preserves a literal __proto__ key from JSON text as an own enumerable prop', () => {
+    // Built from a string literal, not JSON.stringify of an object literal —
+    // `{ __proto__: 'enemy' }` would set the prototype instead of an own key,
+    // so JSON.stringify of that object would drop it entirely.
+    const text = '{"format":"ra2web-assistant-config","version":1,"exportedAt":"x",'
+      + '"data":{"playerTags":{"__proto__":"enemy","a":"reliable"}}}'
+    const r = parseConfigFile(text)
+    expect(r.ok).toBe(true)
+    if (!r.ok)
+      return
+    expect(Object.getPrototypeOf(r.data.playerTags)).toBeNull()
+    expect(Object.keys(r.data.playerTags!).sort()).toEqual(['__proto__', 'a'])
+    expect(Object.getOwnPropertyDescriptor(r.data.playerTags, '__proto__')?.value).toBe('enemy')
   })
 })
 

@@ -64,6 +64,7 @@ function sanitizeSettings(raw: Record<string, unknown>): Ra2Settings {
     ...s,
     fontSize: Math.min(FONT_MAX, Math.max(FONT_MIN, Math.round(Number.isFinite(s.fontSize) ? s.fontSize : 14))),
     enabledCrateTypes: [...new Set(crates.filter(id => typeof id === 'number' && known.has(id)))],
+    selectedPresetIndex: Number.isInteger(s.selectedPresetIndex) && s.selectedPresetIndex >= -1 ? s.selectedPresetIndex : -1,
   }
 }
 

@@ -148,4 +148,42 @@ describe('sidepanel config export/import', () => {
     expect(w.text()).toContain('檔案不是有效的 JSON')
     w.unmount()
   })
+
+  it('rejects an oversized file before reading it, without showing a pending box', async () => {
+    const w = await mountPanel()
+    const input = w.find('[data-testid="config-file-input"]')
+    const file = new File(['{}'], 'big.json')
+    Object.defineProperty(file, 'size', { value: 1_000_001 })
+    Object.defineProperty(input.element, 'files', { value: [file], configurable: true })
+    await input.trigger('change')
+    await flush()
+    expect(w.find('[data-testid="config-pending"]').exists()).toBe(false)
+    expect(w.text()).toContain('檔案過大(上限 1 MB)')
+    w.unmount()
+  })
+
+  it('import success is not blocked on apply reaching a (possibly unreachable) game tab', async () => {
+    const w = await mountPanel()
+    apply.mockImplementationOnce(() => new Promise(() => {})) // never resolves — no game tab
+    await pickFile(w, { format: 'ra2web-assistant-config', version: 1, data: { playerTags: { bob: 'newbie' } } })
+    await w.find('[data-testid="config-confirm"]').trigger('click')
+    await flush()
+    expect(w.find('[data-testid="config-pending"]').exists()).toBe(false)
+    expect(w.find('[data-testid="config-export"]').attributes('disabled')).toBeUndefined()
+    expect(w.find('[data-testid="config-import"]').attributes('disabled')).toBeUndefined()
+    expect(w.text()).toContain('已匯入設定檔')
+    w.unmount()
+  })
+
+  it('confirm shows an error and keeps the pending box when the storage write fails', async () => {
+    const w = await mountPanel()
+    await pickFile(w, { format: 'ra2web-assistant-config', version: 1, data: { playerTags: { bob: 'newbie' } } })
+    browserMock.storage.local.set.mockRejectedValueOnce(new Error('disk full'))
+    await w.find('[data-testid="config-confirm"]').trigger('click')
+    await flush()
+    expect(w.text()).toContain('匯入失敗')
+    expect(w.find('[data-testid="config-pending"]').exists()).toBe(true)
+    expect(w.find('[data-testid="config-confirm"]').attributes('disabled')).toBeUndefined()
+    w.unmount()
+  })
 })

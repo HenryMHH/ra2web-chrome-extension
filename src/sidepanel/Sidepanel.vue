@@ -13,6 +13,7 @@ import Toast from '~/sidepanel/components/Toast.vue'
 import ConfigTransferRow from '~/sidepanel/components/ConfigTransferRow.vue'
 import type { ConfigData, ImportSummary } from '~/logic/configTransfer'
 import {
+  MAX_CONFIG_FILE_BYTES,
   buildConfigFile,
   configFileName,
   parseConfigFile,
@@ -198,6 +199,13 @@ async function exportConfig() {
 }
 
 async function pickConfigFile(file: File) {
+  // Reject on the File's own size before reading the whole thing into memory;
+  // parseConfigFile's text.length check stays as a backstop (e.g. multi-byte
+  // inflation), but this avoids ever loading an oversized file into a string.
+  if (file.size > MAX_CONFIG_FILE_BYTES) {
+    toast.show('err', '檔案過大(上限 1 MB)')
+    return
+  }
   let text: string
   try {
     text = await readFileText(file)
@@ -221,7 +229,6 @@ async function confirmImport() {
   configBusy.value = true
   suppressInstant = true
   try {
-    const data = p.data
     // Clamp selectedPresetIndex against the snapshot list that will exist
     // after import *before* writing, so the bytes we write already equal
     // what reloadFromStorage's clamp + sendApply's save() will produce.
@@ -229,21 +236,42 @@ async function confirmImport() {
     // after suppressInstant flips back to false and — since it differs from
     // the now-clamped settings.value — the useRa2Settings listener reassigns
     // settings.value, reverting the clamp and firing an unguarded extra apply.
+    // Built as a local copy rather than reassigning p.data.settings, so
+    // pendingImport's own object is never mutated (needed for retry after a
+    // failed write, and just generally not our object to mutate).
+    let data = p.data
     if (data.settings) {
       const snapCount = (data.snapshots ?? snapshots.value).length
-      if (data.settings.selectedPresetIndex >= snapCount)
-        data.settings = { ...data.settings, selectedPresetIndex: -1 }
+      const clampedSettings = data.settings.selectedPresetIndex >= snapCount
+        ? { ...data.settings, selectedPresetIndex: -1 }
+        : data.settings
+      data = { ...data, settings: clampedSettings }
     }
     await writeConfigToStorage(data)
     await reloadFromStorage()
     await nextTick()
+    // Storage write + reload succeeding *is* the success boundary — clear the
+    // pending box and unblock the UI here, without waiting on `apply`.
+    // `apply` round-trips through webext-bridge `sendMessage(..., {
+    // context: 'content-script', tabId })`, which (webext-bridge 6.0.1) never
+    // rejects for an undeliverable message: if the active tab isn't a game
+    // tab (or has no content script), it just queues forever. Awaiting it
+    // here would leave configBusy stuck true and every button disabled even
+    // though the import already succeeded. A later-opened game tab still
+    // picks up the imported settings — its content script auto-applies from
+    // storage on `ready`.
     suppressInstant = false
     pendingImport.value = null
-    // sendApply shows its own error toast on failure; only announce success.
-    if (await sendApply({ source: 'instant' }))
-      toast.show('ok', '已匯入設定檔')
+    configBusy.value = false
+    toast.show('ok', '已匯入設定檔')
+    // Fire-and-forget: sendApply already shows its own error toast and
+    // updates the status bar on `{ ok: false }`. The .catch only guards
+    // against the promise rejecting outright so it can't surface as an
+    // unhandled rejection.
+    void sendApply({ source: 'instant' }).catch(() => {})
   }
   catch (e) {
+    // Leave pendingImport set so the user can retry the same import.
     toast.show('err', `匯入失敗:${(e as Error)?.message ?? 'unknown'}`)
   }
   finally {

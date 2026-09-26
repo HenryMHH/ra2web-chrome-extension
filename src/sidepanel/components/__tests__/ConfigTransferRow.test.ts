@@ -65,7 +65,7 @@ describe('configTransferRow', () => {
       expect(w.find(`[data-testid="${id}"]`).attributes('disabled')).toBeDefined()
   })
 
-  it('hides import/export buttons while a pending import awaits confirmation', () => {
+  it('disables import/export buttons while a pending import awaits confirmation', () => {
     const w = mount(ConfigTransferRow, {
       props: { pending: { settings: true, snapshotCount: null, playerTagCount: null } },
     })
