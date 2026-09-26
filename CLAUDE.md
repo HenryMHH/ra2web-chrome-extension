@@ -9,6 +9,7 @@
 3. 地圖上顯示**寶箱內容物**(中文標籤)
 4. 依單位類型**過濾**要顯示哪些 label(custom / preset 兩種模式)
 5. 標籤**字體大小**可調
+6. 在玩家列表(遊戲房 / 遊戲中 / 結算)標記**玩家性質**(可靠 / 敵人 / 自私 / 新手)
 
 來源檔案:`ra2web.min.js`,~4.2MB / ~9.6 萬行 minified JS。
 
@@ -415,6 +416,7 @@ src/
 ├── contentScripts/
 │   ├── index.ts                     # isolated world：注入 + auto-apply + webext-bridge 中繼
 │   ├── views/App.vue                # 內容腳本內掛載的 Vue 元件(若有用)
+│   ├── playerTags/                  # 玩家標記:store / slots / widget / menu / styles / controller(isolated world 直接操作 DOM)
 │   └── utils/{dom,pageBridge}.ts    # injectScript + pageCmd promise wrapper
 ├── earlySniff/                      # ★ document_start MAIN-world 入口,只 attach 到 Vite host
 │   └── index.ts                     # hook Object.freeze + stash 到 window.__ra2_runtime + dispatch ra2-runtime-ready
@@ -468,6 +470,7 @@ src/
 ├── constants/
 │   ├── gameVersion.ts               # RA2_GAME_VERSION 字串(顯示用)
 │   ├── icons.ts                     # action icon path 對應
+│   ├── playerTags.ts                # PLAYER_TAGS(可靠 / 敵人 / 自私 / 新手)+ type guard
 │   └── powerups.ts                  # CRATE_TYPES + POWERUP_LABELS (sidepanel + injected 共用)
 ├── logic/
 │   ├── storage.ts
@@ -519,7 +522,7 @@ content script ↔ injected script:`window.postMessage` 每筆帶 `id` / 3 秒 t
 - **已套用篩選**(`ActiveFilterInfo`):顯示上一次 apply 的模式 / 名稱 / 已顯示計數
 - **StatusBar**:`idle | ok | active | error` 四態,Sidepanel mount 時 ping `status` + 監聽 `chrome.tabs.onActivated` 更新
 
-設定持久化:`ra2NamesSettings`(主)、`ra2NamesSnapshots`(快照陣列)。兩支 composable 各自掛 `storage.onChanged` listener,在跨頁修改時即時同步。
+設定持久化:`ra2NamesSettings`(主)、`ra2NamesSnapshots`(快照陣列)、`ra2PlayerTags`(玩家標記,`Record<玩家名, PlayerTagId>`)。兩支 composable 各自掛 `storage.onChanged` listener,在跨頁修改時即時同步。
 
 ### manifest.json 重點
 
@@ -827,3 +830,18 @@ chronodivide 對照組:
 ```
 
 (loader log 順序兩邊不同 —— SystemJS 路徑同步、Vite 路徑要等 stash,但 `loadClasses` 都不 block `announceReady`,所以 systemjs 線會看到 `injected, awaiting commands` 早於 `patched` log)
+
+---
+
+## 十一、玩家標記(Player Tags)
+
+- 完全在 **content script(isolated world)** 執行:DOM + `browser.storage` 都拿得到,不經 injected / postMessage。入口 `startPlayerTags()`(`src/contentScripts/playerTags/index.ts`),在 `contentScripts/index.ts` 啟動。
+- 偵測三個畫面的名稱格(`slots.ts`):
+  - 遊戲中:`.diplo-form td.player-name`
+  - 結算:`.score-wrapper td.player-name`
+  - 遊戲房:`.player-slots .player-slot:not(.player-slot-header)`,**僅限 `.rank-indicator[data-r-tooltip]` 存在的 slot**(空位「開放 / 關閉」沒有 tooltip);別人是 `div.player-name .select-value > div`,自己是 `input.player-name`(anchor 插在 input 後面、控制項疊在 input 右端)。
+- 名稱只取直接子 text node(`ownText`),避免讀到我們 widget 的文字。
+- Widget 是 0 寬 `span.ra2pt-anchor` + 絕對定位內容,不改遊戲元素 style。`syncWidget` idempotent(`data-name` / `data-tag` 相同就不動 DOM),`pruneWidgets` 清掉失效 anchor;MutationObserver 過濾自己造成的 mutation,避免無限重掃。
+- Dropdown 是 body-level `position:fixed`(`menu.ts`),避開遊戲容器 overflow / z-index;outside mousedown(capture)/ Esc 關閉;同一按鈕再點 = toggle。
+- Storage `ra2PlayerTags`:`Record<玩家名(trim), 'reliable'|'enemy'|'selfish'|'newbie'>`,寫入一律 read-modify-write(`all_frames` 下可能多實例)。`onTagsChanged` 讓跨畫面 / 跨分頁即時同步。
+- 限制:名稱為 key,跨伺服器同名視為同一人;`stopPropagation` 只擋冒泡,遊戲若在 capture phase 攔事件仍會收到。
