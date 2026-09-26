@@ -1,4 +1,5 @@
 import { onMessage } from 'webext-bridge/content-script'
+import { startPlayerTags } from './playerTags'
 import { injectScript } from './utils/dom'
 import { onPageReady, pageCmd } from './utils/pageBridge'
 
@@ -17,6 +18,7 @@ interface StoredSettings {
   // eslint-disable-next-line no-console
   console.info('[ra2-names] content script loaded')
   injectScript()
+  startPlayerTags()
 
   // Auto-apply stored settings as soon as the page side announces ready.
   onPageReady(async () => {
