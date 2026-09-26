@@ -1,8 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { downloadTextFile, readFileText } from '../fileIO'
 
+const origCreate = URL.createObjectURL
+const origRevoke = URL.revokeObjectURL
+
 afterEach(() => {
   vi.restoreAllMocks()
+  URL.createObjectURL = origCreate
+  URL.revokeObjectURL = origRevoke
+  vi.useRealTimers()
 })
 
 describe('downloadTextFile', () => {
@@ -26,7 +32,6 @@ describe('downloadTextFile', () => {
     expect(document.querySelectorAll('a[download]').length).toBe(0)
     vi.runAllTimers()
     expect(revoke).toHaveBeenCalledWith('blob:fake')
-    vi.useRealTimers()
   })
 })
 
