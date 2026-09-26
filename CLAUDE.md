@@ -522,7 +522,7 @@ content script ↔ injected script:`window.postMessage` 每筆帶 `id` / 3 秒 t
 - **已套用篩選**(`ActiveFilterInfo`):顯示上一次 apply 的模式 / 名稱 / 已顯示計數
 - **StatusBar**:`idle | ok | active | error` 四態,Sidepanel mount 時 ping `status` + 監聽 `chrome.tabs.onActivated` 更新
 
-設定持久化:`ra2NamesSettings`(主)、`ra2NamesSnapshots`(快照陣列)、`ra2PlayerTags`(玩家標記,`Record<玩家名, PlayerTagId>`)。兩支 composable 各自掛 `storage.onChanged` listener,在跨頁修改時即時同步。
+設定持久化:`ra2NamesSettings`(主)、`ra2NamesSnapshots`(快照陣列)——兩支 composable(`useRa2Settings.ts` / `useRa2Snapshots.ts`)各自掛 `storage.onChanged` listener,在跨頁修改時即時同步。`ra2PlayerTags`(玩家標記,`Record<玩家名, PlayerTagId>`)不經 composable,同步走 content script 內的 `store.onTagsChanged`(見第十一節)。
 
 ### manifest.json 重點
 
@@ -842,6 +842,6 @@ chronodivide 對照組:
   - 遊戲房:`.player-slots .player-slot:not(.player-slot-header)`,**僅限 `.rank-indicator[data-r-tooltip]` 存在的 slot**(空位「開放 / 關閉」沒有 tooltip);別人是 `div.player-name .select-value > div`,自己是 `input.player-name`(anchor 插在 input 後面、控制項疊在 input 右端)。
 - 名稱只取直接子 text node(`ownText`),避免讀到我們 widget 的文字。
 - Widget 是 0 寬 `span.ra2pt-anchor` + 絕對定位內容,不改遊戲元素 style。`syncWidget` idempotent(`data-name` / `data-tag` 相同就不動 DOM),`pruneWidgets` 清掉失效 anchor;MutationObserver 過濾自己造成的 mutation,避免無限重掃。
-- Dropdown 是 body-level `position:fixed`(`menu.ts`),避開遊戲容器 overflow / z-index;outside mousedown(capture)/ Esc 關閉;同一按鈕再點 = toggle。
-- Storage `ra2PlayerTags`:`Record<玩家名(trim), 'reliable'|'enemy'|'selfish'|'newbie'>`,寫入一律 read-modify-write(`all_frames` 下可能多實例)。`onTagsChanged` 讓跨畫面 / 跨分頁即時同步。
+- Dropdown 是 body-level `position:fixed`(`menu.ts`),避開遊戲容器 overflow / z-index;outside mousedown(capture)/ Esc 關閉;同一按鈕再點 = toggle。選單開啟期間按 Esc 會 `e.stopPropagation()` + `e.preventDefault()` 後才 `closeTagMenu()`,避免同一個 Esc 又被遊戲收到(例如把外交畫面也關掉);這個 keydown listener 只在選單開啟時掛著,選單關閉後 Esc 不受影響。
+- Storage `ra2PlayerTags`:`Record<玩家名(trim), 'reliable'|'enemy'|'selfish'|'newbie'>`,寫入一律 read-modify-write(`all_frames` 下可能多實例)。`onTagsChanged` 讓跨畫面 / 跨分頁即時同步。tag map 一律用 `Object.create(null)` 建構(`normalizeTagMap` / `cloneTagMap`),避免名字剛好是 `constructor`/`toString` 等 `Object.prototype` 成員時查詢誤命中,也讓名字是 `__proto__` 的玩家能正常寫入(一般物件對 `__proto__` 這個 key 走的是 setter,不是一般屬性賦值)。
 - 限制:名稱為 key,跨伺服器同名視為同一人;`stopPropagation` 只擋冒泡,遊戲若在 capture phase 攔事件仍會收到。
