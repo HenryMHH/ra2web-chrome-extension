@@ -134,3 +134,36 @@ export function configFileName(now: Date): string {
   const time = `${pad(now.getHours())}${pad(now.getMinutes())}`
   return `ra2web-assistant-config-${date}-${time}.json`
 }
+
+export const CONFIG_STORAGE_KEYS = {
+  settings: 'ra2NamesSettings',
+  snapshots: 'ra2NamesSnapshots',
+  playerTags: 'ra2PlayerTags',
+} as const
+
+export async function readConfigFromStorage(): Promise<Required<ConfigData>> {
+  const keys = Object.values(CONFIG_STORAGE_KEYS)
+  const obj = await browser.storage.local.get(keys)
+  const rawSnaps = obj[CONFIG_STORAGE_KEYS.snapshots]
+  return {
+    settings: normalizeSettings(obj[CONFIG_STORAGE_KEYS.settings] as Parameters<typeof normalizeSettings>[0]),
+    snapshots: Array.isArray(rawSnaps) ? sanitizeSnapshots(rawSnaps) : [],
+    playerTags: normalizeTagMap(obj[CONFIG_STORAGE_KEYS.playerTags]),
+  }
+}
+
+export async function writeConfigToStorage(data: ConfigData): Promise<void> {
+  const payload: Record<string, unknown> = {}
+  if (data.settings)
+    payload[CONFIG_STORAGE_KEYS.settings] = data.settings
+  if (data.snapshots)
+    payload[CONFIG_STORAGE_KEYS.snapshots] = data.snapshots
+  if (data.playerTags)
+    payload[CONFIG_STORAGE_KEYS.playerTags] = { ...data.playerTags }
+  if (Object.keys(payload).length === 0)
+    return
+  // JSON-roundtrip strips Vue reactive Proxy wrappers; chrome.storage.local.set
+  // uses structured clone and throws DataCloneError on reactive arrays/objects.
+  // Single set() so the three keys land together.
+  await browser.storage.local.set(JSON.parse(JSON.stringify(payload)))
+}
