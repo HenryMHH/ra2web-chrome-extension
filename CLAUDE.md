@@ -885,7 +885,8 @@ chronodivide 對照組:
 - **settings**:`parseConfigFile`(匯入)呼叫私有的 `sanitizeSettings`(`configTransfer.ts:59-68`,唯一呼叫點在 `~108`):先過 `normalizeSettings`(既有的 legacy migration / 預設值邏輯),再夾字級 `fontSize` 到 10–20 並四捨五入,`enabledCrateTypes` 過濾成只保留 `CRATE_TYPES` 白名單內的數字 id(`Set` 去重)。`readConfigFromStorage`(匯出,`~149`)只呼叫裸的 `normalizeSettings`,**不做**這兩步額外夾值——所以匯出的 `fontSize` / `enabledCrateTypes` 就是 storage 裡現有的值,不會被重新 clamp / 過濾
 - **snapshots**:兩端都呼叫同一個 `sanitizeSnapshots`,逐筆驗證,不是 plain object、缺 `shownUnits`、`name` 不是非空字串就整筆丟棄(不是整檔失敗);`shownUnits` 過 `normalizeShown`,`totalCount` 非有限數字或負數時 fallback 為 `0`
 - **playerTags**:兩端都呼叫同一個 `normalizeTagMap`(`~/contentScripts/playerTags/store`,見第十一節)還原 `Object.create(null)` 不變式
-- **檔案大小**:`text.length`(UTF-16 code unit 數,約 1 MB)超過 `MAX_CONFIG_FILE_BYTES`(`1_000_000`)直接拒絕,不解析 JSON
+- **檔案大小**:`Sidepanel.vue` 的 `pickConfigFile` 先比對 `File.size`(bytes)是否超過 `MAX_CONFIG_FILE_BYTES`(`1_000_000`),超過就直接拒絕、連 `readFileText` 都不呼叫,避免把整個超大檔案讀進記憶體。`parseConfigFile` 內 `text.length`(UTF-16 code unit 數)的檢查留著當 backstop(例如萬一有呼叫端跳過前置檢查直接傳文字進來)
+- **`selectedPresetIndex`**:`sanitizeSettings` 額外把它夾成整數且 `>= -1`(`Number.isInteger(i) && i >= -1 ? i : -1`),非整數(如 `0.5`)或小於 `-1`(如 `-7`)一律歸零成 `-1`。`filterMode` 不受影響——只有型別本來就是字面量 union,`normalizeSettings` 的 `raw.filterMode === 'preset' ? 'preset' : 'custom'` 已經是封閉的
 
 ### 版本規則
 
@@ -895,7 +896,17 @@ chronodivide 對照組:
 
 `Sidepanel.vue` 的 `confirmImport()` 在寫入前把 `suppressInstant = true`,依序 `writeConfigToStorage(data)` → `reloadFromStorage()`(重新 `load()` + `loadSnapshots()`,並重跑「clamp `selectedPresetIndex`」邏輯、同步 `draftFilter`)→ `nextTick()` 才把 `suppressInstant` 放回 `false`。這是因為 `settings` / `snapshots` / `enabledCrateTypes` 等欄位在 `reloadFromStorage` 內會被逐一重新賦值,若不擋著,原本掛在這些欄位上的 instant-apply `watch`(`Sidepanel.vue:259-275`)會在還原過程中被連續觸發好幾次;擋住之後,匯入流程結尾只手動呼叫一次 `sendApply({ source: 'instant' })`,確保「匯入 → 立即 apply」只送一筆 `apply` command,不是欄位數量筆。
 
+### 成功邊界是「寫入 storage + reload」,不是 apply
+
+`confirmImport` 的成功判定**不等 `sendApply` resolve**。`sendApply` 內部經 `useRa2Bridge().apply()` 呼叫 webext-bridge 的 `sendMessage(..., { context: 'content-script', tabId })`,把 command 送去目前 active tab 的 content script。若那個分頁根本不是遊戲頁(或還沒注入 content script),webext-bridge 6.0.1 **不會 reject**——訊息會排進 queue 一直等,永遠不 resolve。若 `confirmImport` 用 `await` 包住這段,`configBusy` 會卡在 `true`,匯出/匯入按鈕永久 disabled,即使 storage 早就寫成功了。
+
+因此 `confirmImport` 把 `writeConfigToStorage` + `reloadFromStorage` + `nextTick()` 視為成功邊界:完成後立刻 `suppressInstant = false`、清空 `pendingImport`、`configBusy = false`、跳出「已匯入設定檔」toast;然後才用 `void sendApply({ source: 'instant' }).catch(() => {})` **不 await** 地把 apply 丟出去——`.catch` 只是防止極端情況下 promise 直接 reject 變成 unhandled rejection,`sendApply` 內部原本就有自己的錯誤 toast / status bar 更新邏輯,失敗與否都不影響匯入本身已成功的事實。若 active tab 不是遊戲頁而使 apply 永遠不 resolve,使用者稍後打開遊戲分頁時,該分頁的 content script 會在收到 `ready` 後自動從 storage 讀設定並 apply(見第六節「指令協定」段落),所以匯入的設定不會遺失,只是不會立刻反映在畫面上。
+
+寫入失敗(`writeConfigToStorage` 或之前的 clamp 邏輯拋出例外)則走 `catch` 分支:顯示「匯入失敗:...」toast,**刻意不清空 `pendingImport`**,讓使用者可以直接重按「確認匯入」重試;`finally` 保證不論成功或失敗都把 `suppressInstant` 和 `configBusy` 收回 `false` / 關閉忙碌狀態。
+
 **額外細節(比原計畫多一步)**:`confirmImport` 在 `writeConfigToStorage` **之前**,若匯入的 `data.settings` 存在,會先把它的 `selectedPresetIndex` 依「匯入後即將存在的快照數」(`data.snapshots ?? snapshots.value`,以匯入檔本身的快照為準,檔案沒帶 snapshots 才 fallback 現有的)夾到 `-1`(若原本的 index 超出範圍)。這一步刻意搬到寫入 storage 之前,而不是留給 `reloadFromStorage` 事後夾:若寫進 storage 的還是未夾過的原始值,`browser.storage.onChanged` 對這次寫入的回呼(在其他分頁/`useRa2Settings` 內的 listener)會在 `suppressInstant` 已經放回 `false` 之後才到達,拿到的又是「與目前記憶體內已夾過的 `settings.value` 不 JSON-相等」的舊值,`useRa2Settings` 的 listener 就會用這筆 echo 覆寫回未夾過的 `settings.value`——等於讓 clamp 被打回原形,還會多觸發一次不受 `suppressInstant`保護的 instant apply。先夾好再寫,確保每一筆 `storage.onChanged` echo 都和記憶體內的 settings JSON-相等,listener 直接 no-op。
+
+這個 clamp 建在一份**本地複製**上(`{ ...p.data, settings: clampedSettings }`),不會回頭改到 `pendingImport.value.data.settings`——若後面 `writeConfigToStorage` 失敗、`catch` 分支保留 `pendingImport` 讓使用者重試,重試按的還是原始未被動過的 pending 物件。
 
 ### 未提交 draft 不匯出
 
