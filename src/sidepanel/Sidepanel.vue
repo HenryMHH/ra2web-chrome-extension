@@ -221,7 +221,20 @@ async function confirmImport() {
   configBusy.value = true
   suppressInstant = true
   try {
-    await writeConfigToStorage(p.data)
+    const data = p.data
+    // Clamp selectedPresetIndex against the snapshot list that will exist
+    // after import *before* writing, so the bytes we write already equal
+    // what reloadFromStorage's clamp + sendApply's save() will produce.
+    // Otherwise a storage.onChanged echo of the unclamped write can arrive
+    // after suppressInstant flips back to false and — since it differs from
+    // the now-clamped settings.value — the useRa2Settings listener reassigns
+    // settings.value, reverting the clamp and firing an unguarded extra apply.
+    if (data.settings) {
+      const snapCount = (data.snapshots ?? snapshots.value).length
+      if (data.settings.selectedPresetIndex >= snapCount)
+        data.settings = { ...data.settings, selectedPresetIndex: -1 }
+    }
+    await writeConfigToStorage(data)
     await reloadFromStorage()
     await nextTick()
     suppressInstant = false

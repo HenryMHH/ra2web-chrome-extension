@@ -109,6 +109,7 @@ describe('sidepanel config export/import', () => {
     mem.ra2NamesSnapshots = [{ name: 'old', shownUnits: 'all', totalCount: 0 }]
     const w = await mountPanel()
     apply.mockClear()
+    browserMock.storage.local.set.mockClear()
     await pickFile(w, {
       format: 'ra2web-assistant-config',
       version: 1,
@@ -129,6 +130,14 @@ describe('sidepanel config export/import', () => {
     // selectedPresetIndex 5 is out of range for 1 snapshot → clamped to -1 → custom list used
     expect(opts.shownUnits).toEqual(['E1'])
     expect(w.find('[data-testid="config-pending"]').exists()).toBe(false)
+
+    // The import write itself (first storage.local.set call, from
+    // writeConfigToStorage) must already carry the clamped index — not just
+    // the later reload/save — so a storage.onChanged echo of that write is
+    // JSON-identical to settings.value and the useRa2Settings listener no-ops
+    // instead of reverting the clamp and firing a spurious extra apply.
+    const firstSetCall = browserMock.storage.local.set.mock.calls[0][0] as Record<string, any>
+    expect(firstSetCall.ra2NamesSettings.selectedPresetIndex).toBe(-1)
     w.unmount()
   })
 
