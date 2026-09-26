@@ -37,7 +37,7 @@ interface LegacyShape {
   showCrateContents?: boolean
 }
 
-function normalizeShown(raw: unknown): ShownUnits {
+export function normalizeShown(raw: unknown): ShownUnits {
   if (raw === 'all')
     return 'all'
   if (Array.isArray(raw))
@@ -45,7 +45,7 @@ function normalizeShown(raw: unknown): ShownUnits {
   return 'all'
 }
 
-function normalizeSettings(raw: (Partial<Ra2Settings> & LegacyShape) | undefined): Ra2Settings {
+export function normalizeSettings(raw: (Partial<Ra2Settings> & LegacyShape) | undefined): Ra2Settings {
   if (!raw)
     return { ...DEFAULTS }
   let enabledCrateTypes = raw.enabledCrateTypes
