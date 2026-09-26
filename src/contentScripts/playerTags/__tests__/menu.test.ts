@@ -69,6 +69,28 @@ describe('openTagMenu', () => {
     expect(isTagMenuOpen()).toBe(false)
   })
 
+  it('escape stops propagation and prevents default so the game (e.g. diplomacy screen) does not also react to it', () => {
+    openTagMenu(button, () => {})
+    const windowHandler = vi.fn()
+    window.addEventListener('keydown', windowHandler)
+    const ev = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+    document.dispatchEvent(ev)
+    expect(isTagMenuOpen()).toBe(false)
+    expect(ev.defaultPrevented).toBe(true)
+    expect(windowHandler).not.toHaveBeenCalled()
+    window.removeEventListener('keydown', windowHandler)
+  })
+
+  it('a non-Escape key does not stop propagation', () => {
+    openTagMenu(button, () => {})
+    const windowHandler = vi.fn()
+    window.addEventListener('keydown', windowHandler)
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+    expect(windowHandler).toHaveBeenCalledTimes(1)
+    window.removeEventListener('keydown', windowHandler)
+    closeTagMenu()
+  })
+
   it('menu clicks do not reach the game', () => {
     const gameClick = vi.fn()
     document.body.addEventListener('click', gameClick)

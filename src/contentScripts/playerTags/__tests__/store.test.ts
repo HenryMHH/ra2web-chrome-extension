@@ -76,7 +76,11 @@ describe('player tag constants', () => {
   })
 
   it('getPlayerTag returns the def', () => {
-    expect(getPlayerTag('newbie').label).toBe('新手')
+    expect(getPlayerTag('newbie')!.label).toBe('新手')
+  })
+
+  it('getPlayerTag returns undefined (not a throwing accessor) for an unknown id', () => {
+    expect(getPlayerTag('not-a-real-tag' as any)).toBeUndefined()
   })
 })
 
@@ -133,5 +137,31 @@ describe('store', () => {
     off()
     await setTag('frank', 'enemy')
     expect(cb).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('prototype-pollution safety', () => {
+  it('normalizeTagMap returns a null-prototype map (no inherited Object.prototype members)', () => {
+    const map = normalizeTagMap({ alice: 'reliable' })
+    expect(Object.getPrototypeOf(map)).toBeNull()
+    // A player literally named "constructor"/"toString" must not resolve to an
+    // inherited function via property lookup when no such entry was ever set.
+    expect((map as any).constructor).toBeUndefined()
+    expect((map as any).toString).toBeUndefined()
+    expect((map as any).hasOwnProperty).toBeUndefined()
+  })
+
+  it('a player named "__proto__" round-trips through setTag/loadTags/normalizeTagMap', async () => {
+    await setTag('__proto__', 'enemy')
+    const map = await loadTags()
+    // Must be a real OWN property with the tag value, not the exotic [[Prototype]] setter
+    // silently swallowing the write (which is what a plain-object map does).
+    expect(Object.getOwnPropertyDescriptor(map, '__proto__')?.value).toBe('enemy')
+    expect(Object.getPrototypeOf(map)).toBeNull()
+    expect(Object.keys(map)).toEqual(['__proto__'])
+
+    await removeTag('__proto__')
+    const map2 = await loadTags()
+    expect(Object.keys(map2)).toEqual([])
   })
 })

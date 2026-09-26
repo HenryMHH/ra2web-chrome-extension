@@ -1,7 +1,7 @@
 import { MENU_CLASS, closeTagMenu, openTagMenu } from './menu'
 import { ANCHOR_CLASS, findNameSlots } from './slots'
 import type { PlayerTagMap } from './store'
-import { loadTags, onTagsChanged, removeTag, setTag } from './store'
+import { cloneTagMap, emptyTagMap, loadTags, onTagsChanged, removeTag, setTag } from './store'
 import { ensureStyles } from './styles'
 import type { WidgetHandlers } from './widget'
 import { pruneWidgets, syncWidget } from './widget'
@@ -29,25 +29,56 @@ function isOwnMutation(m: MutationRecord): boolean {
   return nodes.length > 0 && nodes.every(n => n.nodeType === Node.ELEMENT_NODE && (n as Element).matches(OURS))
 }
 
+// document.body can be missing very early in the page lifecycle (observed on some all_frames
+// frames). MutationObserver.observe() throws synchronously against a null target, and a throw
+// here would otherwise abort the whole content-script bootstrap. Rather than deferring to
+// DOMContentLoaded (more moving parts, and this feature is best-effort), just no-op: the game
+// UI this feature targets never exists before <body> does anyway, so there is nothing to scan.
+function noopController(): PlayerTagsController {
+  return { ready: Promise.resolve(), scanNow: () => {}, stop: () => {} }
+}
+
 export function startPlayerTags(doc: Document = document): PlayerTagsController {
-  let tags: PlayerTagMap = {}
+  if (!doc.body) {
+    console.warn('[ra2-names] player tags: document.body not available, skipping')
+    return noopController()
+  }
+
+  let tags: PlayerTagMap = emptyTagMap()
   let stopped = false
   let scheduled = false
 
   ensureStyles(doc)
 
+  // On a rejected write, the optimistic local state may now disagree with storage — reload the
+  // authoritative map and re-render rather than leaving the UI stuck showing the unsaved change.
+  function reloadFromStorage() {
+    loadTags().then((map) => {
+      tags = map
+      scanNow()
+    })
+  }
+
   const handlers: WidgetHandlers = {
     onAdd(name, button) {
       openTagMenu(button, (id) => {
-        tags = { ...tags, [name]: id }
+        tags = cloneTagMap(tags)
+        tags[name] = id
         scanNow()
-        setTag(name, id).catch(e => console.warn('[ra2-names] setTag failed:', e))
+        setTag(name, id).catch((e) => {
+          console.warn('[ra2-names] setTag failed:', e)
+          reloadFromStorage()
+        })
       })
     },
     onRemove(name) {
-      tags = Object.fromEntries(Object.entries(tags).filter(([n]) => n !== name))
+      tags = cloneTagMap(tags)
+      delete tags[name]
       scanNow()
-      removeTag(name).catch(e => console.warn('[ra2-names] removeTag failed:', e))
+      removeTag(name).catch((e) => {
+        console.warn('[ra2-names] removeTag failed:', e)
+        reloadFromStorage()
+      })
     },
   }
 
@@ -55,8 +86,16 @@ export function startPlayerTags(doc: Document = document): PlayerTagsController 
     if (stopped)
       return
     const keep = new Set<HTMLElement>()
-    for (const slot of findNameSlots(doc))
-      keep.add(syncWidget(slot, tags[slot.name], handlers))
+    for (const slot of findNameSlots(doc)) {
+      try {
+        keep.add(syncWidget(slot, tags[slot.name], handlers))
+      }
+      catch (e) {
+        // One malformed slot/tag must not stop the rest of the scan (and skipping pruneWidgets
+        // below) — log and keep going.
+        console.warn('[ra2-names] syncWidget failed for player:', slot.name, e)
+      }
+    }
     pruneWidgets(doc, keep)
   }
 

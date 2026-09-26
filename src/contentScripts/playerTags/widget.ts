@@ -45,16 +45,19 @@ function createAnchor(slot: NameSlot): HTMLElement {
 
 function render(a: HTMLElement, tag: PlayerTagId | undefined): void {
   const doc = a.ownerDocument
+  // getPlayerTag can return undefined for a stale/unknown id (defense in depth — should not
+  // normally happen once tag maps are built with Object.create(null), but a corrupt/foreign
+  // storage value must fall back to the untagged "+" state instead of throwing on def.bg).
+  const def = tag ? getPlayerTag(tag) : undefined
   const inner = doc.createElement('span')
   inner.className = 'ra2pt-inner'
   const btn = doc.createElement('button')
   btn.type = 'button'
   btn.className = 'ra2pt-btn'
-  btn.textContent = tag ? '-' : '+'
-  btn.title = tag ? '移除標籤' : '標記玩家'
+  btn.textContent = def ? '-' : '+'
+  btn.title = def ? '移除標籤' : '標記玩家'
   inner.appendChild(btn)
-  if (tag) {
-    const def = getPlayerTag(tag)
+  if (def) {
     const label = doc.createElement('span')
     label.className = 'ra2pt-tag'
     label.style.background = def.bg

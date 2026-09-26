@@ -63,8 +63,14 @@ export function openTagMenu(button: HTMLElement, onPick: (id: PlayerTagId) => vo
     closeTagMenu()
   }
   const onKey = (e: KeyboardEvent) => {
-    if (e.key === 'Escape')
-      closeTagMenu()
+    if (e.key !== 'Escape')
+      return
+    // Swallow it: this listener only exists while the menu is open, so this never affects Esc
+    // otherwise — but without stopping it here, the game (e.g. the diplomacy screen) would also
+    // react to the same Esc and close itself.
+    e.stopPropagation()
+    e.preventDefault()
+    closeTagMenu()
   }
   doc.addEventListener('mousedown', onDocDown, true)
   doc.addEventListener('keydown', onKey, true)

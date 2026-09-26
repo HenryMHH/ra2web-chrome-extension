@@ -18,7 +18,6 @@ interface StoredSettings {
   // eslint-disable-next-line no-console
   console.info('[ra2-names] content script loaded')
   injectScript()
-  startPlayerTags()
 
   // Auto-apply stored settings as soon as the page side announces ready.
   onPageReady(async () => {
@@ -44,4 +43,14 @@ interface StoredSettings {
   onMessage('ra2:apply', async ({ data }) => pageCmd('apply', data) as any)
   onMessage('ra2:status', async () => pageCmd('status') as any)
   onMessage('ra2:getUnitNames', async () => pageCmd('getUnitNames') as any)
+
+  // Player tags is a self-contained, best-effort feature: it must never take down the bridge
+  // wiring above (e.g. a synchronous throw from observer.observe() on a frame with no <body>
+  // yet), so it starts last and is isolated in its own try/catch.
+  try {
+    startPlayerTags()
+  }
+  catch (e) {
+    console.warn('[ra2-names] player tags failed to start:', e)
+  }
 })()

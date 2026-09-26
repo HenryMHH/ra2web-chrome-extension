@@ -5,16 +5,31 @@ export const PLAYER_TAGS_KEY = 'ra2PlayerTags'
 
 export type PlayerTagMap = Record<string, PlayerTagId>
 
+// Null-prototype: a player literally named "constructor"/"toString"/etc. must not resolve to
+// an inherited Object.prototype member on lookup, and a player named "__proto__" must be a real
+// own property instead of silently hitting the (no-op, for a non-object value) [[Prototype]]
+// setter that a plain `{}` would expose for that key.
+export function emptyTagMap(): PlayerTagMap {
+  return Object.create(null)
+}
+
 export function normalizeTagMap(raw: unknown): PlayerTagMap {
+  const out = emptyTagMap()
   if (!raw || typeof raw !== 'object' || Array.isArray(raw))
-    return {}
-  const out: PlayerTagMap = {}
+    return out
   for (const [name, id] of Object.entries(raw as Record<string, unknown>)) {
     const key = name.trim()
     if (key && isPlayerTagId(id))
       out[key] = id
   }
   return out
+}
+
+// Shallow-clone a tag map while preserving the null-prototype invariant above. Spreading with
+// `{ ...map }` (or Object.fromEntries) always produces a normal Object.prototype-based object,
+// which would silently reintroduce the same lookup hazard for the next read.
+export function cloneTagMap(map: PlayerTagMap): PlayerTagMap {
+  return Object.assign(emptyTagMap(), map)
 }
 
 export async function loadTags(): Promise<PlayerTagMap> {

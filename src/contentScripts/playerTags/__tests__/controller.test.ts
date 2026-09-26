@@ -151,4 +151,66 @@ describe('startPlayerTags', () => {
     await new Promise(r => setTimeout(r, 50))
     expect(document.querySelector('.ra2pt-anchor')).toBeNull()
   })
+
+  it('a player literally named "constructor" gets a "+", and other players still render (Object.prototype must not leak in)', async () => {
+    document.body.innerHTML = `
+      <div class="diplo-form"><div class="players"><table><tbody>
+        <tr><td class="player-name">constructor</td></tr>
+        <tr><td class="player-name">henryla</td></tr>
+      </tbody></table></div></div>`
+    ctl = startPlayerTags()
+    await ctl.ready
+    expect(btnFor('constructor').textContent).toBe('+')
+    expect(btnFor('henryla').textContent).toBe('+')
+  })
+
+  it('tagging a player named "constructor" works like any other name', async () => {
+    document.body.innerHTML = `
+      <div class="diplo-form"><div class="players"><table><tbody>
+        <tr><td class="player-name">constructor</td></tr>
+      </tbody></table></div></div>`
+    ctl = startPlayerTags()
+    await ctl.ready
+    btnFor('constructor').click()
+    const item = document.querySelector<HTMLElement>(`.${MENU_CLASS} [data-tag="enemy"]`)!
+    item.click()
+    await flush()
+    ctl.scanNow()
+    expect(mem[PLAYER_TAGS_KEY]).toEqual({ constructor: 'enemy' })
+    expect(btnFor('constructor').textContent).toBe('-')
+  })
+
+  it('rolls back the optimistic tag when setTag rejects, by reloading from storage', async () => {
+    ctl = startPlayerTags()
+    await ctl.ready
+    const originalSet = storageApi.local.set
+    storageApi.local.set = (_obj: any) => {
+      storageApi.local.set = originalSet
+      return Promise.reject(new Error('quota exceeded'))
+    }
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    btnFor('henryla').click()
+    const item = document.querySelector<HTMLElement>(`.${MENU_CLASS} [data-tag="reliable"]`)!
+    item.click()
+    // optimistic UI shows "-" immediately, before the (about to fail) write settles
+    expect(btnFor('henryla').textContent).toBe('-')
+
+    await flush()
+    await flush()
+    ctl.scanNow()
+    expect(mem[PLAYER_TAGS_KEY]).toBeUndefined()
+    expect(btnFor('henryla').textContent).toBe('+')
+    warn.mockRestore()
+  })
+
+  it('does not throw and cannot break other widgets when startPlayerTags() runs against a document with no <body>', async () => {
+    const other = document.implementation.createHTMLDocument('no-body')
+    other.body!.remove()
+    expect(other.body).toBeNull()
+    const noopCtl = startPlayerTags(other)
+    await expect(noopCtl.ready).resolves.toBeUndefined()
+    expect(() => noopCtl.scanNow()).not.toThrow()
+    expect(() => noopCtl.stop()).not.toThrow()
+  })
 })

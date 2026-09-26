@@ -18,6 +18,6 @@ export function isPlayerTagId(v: unknown): v is PlayerTagId {
   return PLAYER_TAGS.some(t => t.id === v)
 }
 
-export function getPlayerTag(id: PlayerTagId): PlayerTagDef {
-  return PLAYER_TAGS.find(t => t.id === id)!
+export function getPlayerTag(id: PlayerTagId): PlayerTagDef | undefined {
+  return PLAYER_TAGS.find(t => t.id === id)
 }

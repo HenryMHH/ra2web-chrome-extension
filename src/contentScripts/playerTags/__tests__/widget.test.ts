@@ -24,6 +24,12 @@ describe('syncWidget', () => {
     expect(a.querySelector('.ra2pt-tag')).toBeNull()
   })
 
+  it('falls back to the "+" state instead of throwing when the tag id is not a known PlayerTagDef (defense in depth)', () => {
+    const a = syncWidget(inlineSlot(), 'not-a-real-tag' as any, handlers())
+    expect(a.querySelector('.ra2pt-btn')!.textContent).toBe('+')
+    expect(a.querySelector('.ra2pt-tag')).toBeNull()
+  })
+
   it('renders "-" plus the tag label when tagged', () => {
     const a = syncWidget(inlineSlot(), 'enemy', handlers())
     expect(a.querySelector('.ra2pt-btn')!.textContent).toBe('-')
