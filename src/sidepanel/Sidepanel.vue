@@ -10,6 +10,16 @@ import StatusBar from '~/sidepanel/components/StatusBar.vue'
 import ActiveFilterInfo from '~/sidepanel/components/ActiveFilterInfo.vue'
 import type { AppliedFilter } from '~/sidepanel/components/ActiveFilterInfo.vue'
 import Toast from '~/sidepanel/components/Toast.vue'
+import ConfigTransferRow from '~/sidepanel/components/ConfigTransferRow.vue'
+import type { ConfigData, ImportSummary } from '~/logic/configTransfer'
+import {
+  buildConfigFile,
+  configFileName,
+  parseConfigFile,
+  readConfigFromStorage,
+  writeConfigToStorage,
+} from '~/logic/configTransfer'
+import { downloadTextFile, readFileText } from '~/logic/fileIO'
 import type { ShownUnits } from '~/composables/useRa2Settings'
 import { useRa2Settings } from '~/composables/useRa2Settings'
 import { useRa2Snapshots } from '~/composables/useRa2Snapshots'
@@ -51,11 +61,15 @@ function syncDraftFromSettings() {
 
 let suppressInstant = true
 
-async function init() {
+async function reloadFromStorage() {
   await Promise.all([load(), loadSnapshots()])
   if (settings.value.selectedPresetIndex >= snapshots.value.length)
     settings.value.selectedPresetIndex = -1
   syncDraftFromSettings()
+}
+
+async function init() {
+  await reloadFromStorage()
   await nextTick()
   suppressInstant = false
 }
@@ -113,7 +127,7 @@ onBeforeUnmount(() => {
   browser.tabs.onActivated.removeListener(onTabActivated)
 })
 
-async function sendApply(opts: { source: 'instant' | 'filter' }) {
+async function sendApply(opts: { source: 'instant' | 'filter' }): Promise<boolean> {
   await save()
   const r = await bridge.apply({
     enabled: settings.value.enabled,
@@ -150,10 +164,12 @@ async function sendApply(opts: { source: 'instant' | 'filter' }) {
         applySuccess.value = false
       }, APPLY_SUCCESS_MS)
     }
+    return true
   }
   else {
     status.value = { kind: 'error', text: `失敗：${r.error ?? 'unknown'}` }
     toast.show('err', `套用失敗：${r.error ?? 'unknown'}`)
+    return false
   }
 }
 
@@ -164,6 +180,67 @@ async function applyFilter() {
   settings.value.filterMode = draftFilter.value.filterMode
   settings.value.selectedPresetIndex = draftFilter.value.selectedPresetIndex
   await sendApply({ source: 'filter' })
+}
+
+const pendingImport = ref<{ data: ConfigData, summary: ImportSummary } | null>(null)
+const configBusy = ref(false)
+
+async function exportConfig() {
+  try {
+    const now = new Date()
+    const file = buildConfigFile(await readConfigFromStorage(), now)
+    downloadTextFile(configFileName(now), JSON.stringify(file, null, 2))
+    toast.show('ok', '已匯出設定檔')
+  }
+  catch (e) {
+    toast.show('err', `匯出失敗:${(e as Error)?.message ?? 'unknown'}`)
+  }
+}
+
+async function pickConfigFile(file: File) {
+  let text: string
+  try {
+    text = await readFileText(file)
+  }
+  catch {
+    toast.show('err', '無法讀取檔案')
+    return
+  }
+  const r = parseConfigFile(text)
+  if (!r.ok) {
+    toast.show('err', r.error)
+    return
+  }
+  pendingImport.value = { data: r.data, summary: r.summary }
+}
+
+async function confirmImport() {
+  const p = pendingImport.value
+  if (!p)
+    return
+  configBusy.value = true
+  suppressInstant = true
+  try {
+    await writeConfigToStorage(p.data)
+    await reloadFromStorage()
+    await nextTick()
+    suppressInstant = false
+    pendingImport.value = null
+    // sendApply shows its own error toast on failure; only announce success.
+    if (await sendApply({ source: 'instant' }))
+      toast.show('ok', '已匯入設定檔')
+  }
+  catch (e) {
+    toast.show('err', `匯入失敗:${(e as Error)?.message ?? 'unknown'}`)
+  }
+  finally {
+    suppressInstant = false
+    configBusy.value = false
+  }
+}
+
+function cancelImport() {
+  pendingImport.value = null
 }
 
 watch(
@@ -200,7 +277,18 @@ watch(
           v-model:show-neutral="settings.showNeutral"
           v-model:show-indicators="settings.showIndicators"
           v-model:font-size="settings.fontSize"
-        />
+        >
+          <template #top>
+            <ConfigTransferRow
+              :pending="pendingImport?.summary ?? null"
+              :busy="configBusy"
+              @export="exportConfig"
+              @pick="pickConfigFile"
+              @confirm="confirmImport"
+              @cancel="cancelImport"
+            />
+          </template>
+        </SettingsSection>
         <CrateSection v-model="settings.enabledCrateTypes" />
         <FilterSection
           v-model:shownUnitsCustom="draftFilter.shownUnitsCustom"
