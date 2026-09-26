@@ -126,7 +126,7 @@ describe('store', () => {
   it('onTagsChanged fires with normalized map for our key only, and unsubscribes', async () => {
     const cb = vi.fn()
     const off = onTagsChanged(cb)
-    await browser.storage.local.set({ unrelated: 1 })
+    await (globalThis as any).chrome.storage.local.set({ unrelated: 1 })
     expect(cb).not.toHaveBeenCalled()
     await setTag('eve', 'selfish')
     expect(cb).toHaveBeenLastCalledWith({ eve: 'selfish' })
