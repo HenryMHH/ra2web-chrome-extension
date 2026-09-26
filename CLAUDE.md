@@ -880,11 +880,11 @@ chronodivide 對照組:
 
 ### Sanitize 規則
 
-匯入(`parseConfigFile`)與讀 storage 匯出(`readConfigFromStorage`)共用同一套 sanitize,確保匯出的檔案本身也是「乾淨」的:
+`snapshots` / `playerTags` 兩端(匯入 `parseConfigFile`、匯出 `readConfigFromStorage`)共用同一個 normalizer;`settings` 不是——匯出只過 `normalizeSettings`,匯入額外多兩步夾值,兩端結果並不對稱:
 
-- **settings**:先過 `normalizeSettings`(既有的 legacy migration / 預設值邏輯),再夾字級 `fontSize` 到 10–20 並四捨五入,`enabledCrateTypes` 過濾成只保留 `CRATE_TYPES` 白名單內的數字 id(`Set` 去重)
-- **snapshots**:逐筆驗證,不是 plain object、缺 `shownUnits`、`name` 不是非空字串就整筆丟棄(不是整檔失敗);`shownUnits` 過 `normalizeShown`,`totalCount` 非有限數字或負數時 fallback 為 `0`
-- **playerTags**:過 `normalizeTagMap`(`~/contentScripts/playerTags/store`,見第十一節)還原 `Object.create(null)` 不變式
+- **settings**:`parseConfigFile`(匯入)呼叫私有的 `sanitizeSettings`(`configTransfer.ts:59-68`,唯一呼叫點在 `~108`):先過 `normalizeSettings`(既有的 legacy migration / 預設值邏輯),再夾字級 `fontSize` 到 10–20 並四捨五入,`enabledCrateTypes` 過濾成只保留 `CRATE_TYPES` 白名單內的數字 id(`Set` 去重)。`readConfigFromStorage`(匯出,`~149`)只呼叫裸的 `normalizeSettings`,**不做**這兩步額外夾值——所以匯出的 `fontSize` / `enabledCrateTypes` 就是 storage 裡現有的值,不會被重新 clamp / 過濾
+- **snapshots**:兩端都呼叫同一個 `sanitizeSnapshots`,逐筆驗證,不是 plain object、缺 `shownUnits`、`name` 不是非空字串就整筆丟棄(不是整檔失敗);`shownUnits` 過 `normalizeShown`,`totalCount` 非有限數字或負數時 fallback 為 `0`
+- **playerTags**:兩端都呼叫同一個 `normalizeTagMap`(`~/contentScripts/playerTags/store`,見第十一節)還原 `Object.create(null)` 不變式
 - **檔案大小**:`text.length`(UTF-16 code unit 數,約 1 MB)超過 `MAX_CONFIG_FILE_BYTES`(`1_000_000`)直接拒絕,不解析 JSON
 
 ### 版本規則
