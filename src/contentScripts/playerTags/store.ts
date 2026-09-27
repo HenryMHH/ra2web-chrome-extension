@@ -85,6 +85,8 @@ export async function upsertCustomTag(def: PlayerTagDef): Promise<PlayerTagDef[]
   const i = list.findIndex(t => t.id === def.id)
   const next = i >= 0 ? list.map((t, j) => (j === i ? def : t)) : [...list, def]
   const clean = normalizeCustomTags(next)
+  if (!clean.some(t => t.id === def.id))
+    throw new Error('自訂標籤無效或已達上限')
   await browser.storage.local.set({ [CUSTOM_TAGS_KEY]: clean })
   return clean
 }

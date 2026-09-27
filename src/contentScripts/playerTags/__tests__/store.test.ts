@@ -191,6 +191,19 @@ describe('custom tag storage', () => {
     ])
   })
 
+  it('upsertCustomTag rejects (and writes nothing) when the cap drops the new tag', async () => {
+    const full = Array.from({ length: 20 }, (_, i) => ({ id: `t${i}`, label: `x${i}`, bg: '#000000' }))
+    mem[CUSTOM_TAGS_KEY] = full
+    await expect(upsertCustomTag({ id: 'extra', label: 'x', bg: '#000000' })).rejects.toThrow('自訂標籤無效或已達上限')
+    expect(mem[CUSTOM_TAGS_KEY]).toHaveLength(20)
+    expect(mem[CUSTOM_TAGS_KEY].some((t: any) => t.id === 'extra')).toBe(false)
+  })
+
+  it('upsertCustomTag rejects (and writes nothing) for an invalid def', async () => {
+    await expect(upsertCustomTag({ id: 'camper', label: '蹲家', bg: 'red' })).rejects.toThrow('自訂標籤無效或已達上限')
+    expect(mem[CUSTOM_TAGS_KEY]).toBeUndefined()
+  })
+
   it('countTagsWithId counts assignments of one id', () => {
     expect(countTagsWithId(normalizeTagMap({ a: 'camper', b: 'enemy', c: 'camper' }), 'camper')).toBe(2)
   })
