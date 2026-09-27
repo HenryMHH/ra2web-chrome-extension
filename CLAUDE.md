@@ -853,7 +853,7 @@ chronodivide 對照組:
 - 名稱只取直接子 text node(`ownText`),避免讀到我們 widget 的文字。
 - Widget 是 0 寬 `span.ra2pt-anchor` + 絕對定位內容,不改遊戲元素 style。`syncWidget` idempotent(`data-name` / `data-tag` 相同就不動 DOM),`pruneWidgets` 清掉失效 anchor;MutationObserver 過濾自己造成的 mutation,避免無限重掃。
 - Dropdown 是 body-level `position:fixed`(`menu.ts`),避開遊戲容器 overflow / z-index;outside mousedown(capture)/ Esc 關閉;同一按鈕再點 = toggle。選單開啟期間按 Esc 會 `e.stopPropagation()` + `e.preventDefault()` 後才 `closeTagMenu()`,避免同一個 Esc 又被遊戲收到(例如把外交畫面也關掉);這個 keydown listener 只在選單開啟時掛著,選單關閉後 Esc 不受影響。
-- Storage `ra2PlayerTags`:`Record<玩家名(trim), 'reliable'|'enemy'|'selfish'|'newbie'>`,寫入一律 read-modify-write(`all_frames` 下可能多實例)。`onTagsChanged` 讓跨畫面 / 跨分頁即時同步。tag map 一律用 `Object.create(null)` 建構(`normalizeTagMap` / `cloneTagMap`),避免名字剛好是 `constructor`/`toString` 等 `Object.prototype` 成員時查詢誤命中,也讓名字是 `__proto__` 的玩家能正常寫入(一般物件對 `__proto__` 這個 key 走的是 setter,不是一般屬性賦值)。
+- Storage `ra2PlayerTags`:`Record<玩家名(trim), PlayerTagId>`(內建 id,或符合 `CUSTOM_TAG_ID_RE` 格式的自訂 id),寫入一律 read-modify-write(`all_frames` 下可能多實例)。`onTagsChanged` 讓跨畫面 / 跨分頁即時同步。tag map 一律用 `Object.create(null)` 建構(`normalizeTagMap` / `cloneTagMap`),避免名字剛好是 `constructor`/`toString` 等 `Object.prototype` 成員時查詢誤命中,也讓名字是 `__proto__` 的玩家能正常寫入(一般物件對 `__proto__` 這個 key 走的是 setter,不是一般屬性賦值)。
 
 - **自訂標籤**:定義存在 `ra2CustomPlayerTags`(`{ id, label, bg }[]`,陣列順序 = dropdown 順序,排在四個內建之後)。規則集中在 `constants/playerTags.ts`:ID `/^[a-z0-9][a-z0-9_-]{0,23}$/`、不可與內建相同、label 1–8 字(code point)、顏色 `#rrggbb`、最多 20 個;`normalizeCustomTags` 丟棄(不修補)不合法項目。
 - `ra2PlayerTags` 的值只驗 **ID 格式**(`isValidTagId`),不驗定義是否存在。定義存在與否在 `syncWidget` 渲染時用 `getPlayerTag(id, custom)` 判斷;找不到定義 = 視為未標記(顯示「+」且 `data-tag` 為空,點擊開選單而非 `onRemove`)。widget 以 `data-sig`(`label|bg`)偵測同 id 定義變更並重繪;文字色由 `tagTextColor` 依底色亮度選黑 / 白。
@@ -905,7 +905,7 @@ chronodivide 對照組:
 
 `version` 是數字,`root.version > CONFIG_FILE_VERSION`(目前 `1`)時拒絕匯入並提示「請先更新擴充功能」。等於或小於目前版本才繼續 parse——目前只有 v1,尚未有舊版轉換邏輯;未來若 schema 有不相容變更,升版號並在 `parseConfigFile` 內加對應的舊版轉換分支(見文末提醒)。
 
-加入 `customPlayerTags` section 時**未升版**:它是新增的 optional section,舊 v1 檔沒有此 key 就不動既有 storage,不會產生錯誤資料。
+加入 `customPlayerTags` section 時**未升版**:它是新增的 optional section,舊 v1 檔沒有此 key 就不動既有 storage,不會產生錯誤資料。較舊版本的擴充功能匯入此格式檔案時,會略過 `customPlayerTags`,且其 `normalizeTagMap` 只認內建 id,自訂標籤的玩家指派會被丟棄(不報錯);擴充功能自動更新下可接受。
 
 ### `suppressInstant` + 單次 apply
 
@@ -929,4 +929,4 @@ chronodivide 對照組:
 
 ### Schema 變更的連動
 
-**新增 storage key,或改動 `Ra2Settings` / `Snapshot` / `PlayerTagMap` 的 schema 時,`configTransfer.ts` 的 `CONFIG_STORAGE_KEYS` 與對應的 sanitize 函式(`sanitizeSettings` / `sanitizeSnapshots` / `normalizeTagMap`)要一起改;若變更不相容(舊檔案匯入會產生錯誤資料而非單純缺欄位),必須升 `CONFIG_FILE_VERSION` 並在 `parseConfigFile` 內加對應的舊版轉換,不能只加欄位就當作向下相容。**
+**新增 storage key,或改動 `Ra2Settings` / `Snapshot` / `PlayerTagMap` 的 schema 時,`configTransfer.ts` 的 `CONFIG_STORAGE_KEYS` 與對應的 sanitize 函式(`sanitizeSettings` / `sanitizeSnapshots` / `normalizeTagMap`)要一起改;`ra2CustomPlayerTags` / `PlayerTagDef` 的 schema 變更同理要連動 `normalizeCustomTags`。若變更不相容(舊檔案匯入會產生錯誤資料而非單純缺欄位),必須升 `CONFIG_FILE_VERSION` 並在 `parseConfigFile` 內加對應的舊版轉換,不能只加欄位就當作向下相容。**
