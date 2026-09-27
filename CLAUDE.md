@@ -868,7 +868,7 @@ chronodivide 對照組:
 
 ### 檔案格式(v1)
 
-`src/logic/configTransfer.ts` 定義。JSON,三個 section 皆為 optional(存在才代表要匯入該 section):
+`src/logic/configTransfer.ts` 定義。JSON,四個 section 皆為 optional(存在才代表要匯入該 section):
 
 ```json
 {
