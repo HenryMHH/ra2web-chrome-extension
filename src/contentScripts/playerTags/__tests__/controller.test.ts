@@ -56,7 +56,7 @@ const storageApi = {
 }
 
 const { startPlayerTags } = await import('../index')
-const { PLAYER_TAGS_KEY } = await import('../store')
+const { CUSTOM_TAGS_KEY, PLAYER_TAGS_KEY } = await import('../store')
 const { MENU_CLASS, closeTagMenu } = await import('../menu')
 
 const DIPLO = `
@@ -212,5 +212,34 @@ describe('startPlayerTags', () => {
     await expect(noopCtl.ready).resolves.toBeUndefined()
     expect(() => noopCtl.scanNow()).not.toThrow()
     expect(() => noopCtl.stop()).not.toThrow()
+  })
+
+  it('renders stored custom tags and offers them in the dropdown', async () => {
+    mem[CUSTOM_TAGS_KEY] = [{ id: 'camper', label: '蹲家', bg: '#9333ea' }]
+    mem[PLAYER_TAGS_KEY] = { leeqin: 'camper' }
+    ctl = startPlayerTags()
+    await ctl.ready
+    expect(btnFor('leeqin').textContent).toBe('-')
+    expect(document.querySelector('.ra2pt-tag')!.textContent).toBe('蹲家')
+
+    btnFor('henryla').click()
+    document.querySelector<HTMLElement>(`.${MENU_CLASS} [data-tag="camper"]`)!.click()
+    await flush()
+    ctl.scanNow()
+    expect(mem[PLAYER_TAGS_KEY]).toEqual({ leeqin: 'camper', henryla: 'camper' })
+  })
+
+  it('re-renders when custom tag defs change elsewhere (sidepanel edit / delete)', async () => {
+    mem[CUSTOM_TAGS_KEY] = [{ id: 'camper', label: '蹲家', bg: '#9333ea' }]
+    mem[PLAYER_TAGS_KEY] = { leeqin: 'camper' }
+    ctl = startPlayerTags()
+    await ctl.ready
+    await (globalThis as any).chrome.storage.local.set({ [CUSTOM_TAGS_KEY]: [{ id: 'camper', label: '龜', bg: '#9333ea' }] })
+    await new Promise(r => setTimeout(r, 50))
+    expect(document.querySelector('.ra2pt-tag')!.textContent).toBe('龜')
+
+    await (globalThis as any).chrome.storage.local.set({ [CUSTOM_TAGS_KEY]: [] })
+    await new Promise(r => setTimeout(r, 50))
+    expect(btnFor('leeqin').textContent).toBe('+')
   })
 })

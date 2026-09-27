@@ -1,10 +1,21 @@
 import { MENU_CLASS, closeTagMenu, openTagMenu } from './menu'
 import { ANCHOR_CLASS, findNameSlots } from './slots'
 import type { PlayerTagMap } from './store'
-import { cloneTagMap, emptyTagMap, loadTags, onTagsChanged, removeTag, setTag } from './store'
+import {
+  cloneTagMap,
+  emptyTagMap,
+  loadCustomTags,
+  loadTags,
+  onCustomTagsChanged,
+  onTagsChanged,
+  removeTag,
+  setTag,
+} from './store'
 import { ensureStyles } from './styles'
 import type { WidgetHandlers } from './widget'
 import { pruneWidgets, syncWidget } from './widget'
+import type { PlayerTagDef } from '~/constants/playerTags'
+import { allPlayerTags } from '~/constants/playerTags'
 
 export interface PlayerTagsController {
   ready: Promise<void>
@@ -45,6 +56,7 @@ export function startPlayerTags(doc: Document = document): PlayerTagsController 
   }
 
   let tags: PlayerTagMap = emptyTagMap()
+  let customTags: PlayerTagDef[] = []
   let stopped = false
   let scheduled = false
 
@@ -53,8 +65,9 @@ export function startPlayerTags(doc: Document = document): PlayerTagsController 
   // On a rejected write, the optimistic local state may now disagree with storage — reload the
   // authoritative map and re-render rather than leaving the UI stuck showing the unsaved change.
   function reloadFromStorage() {
-    loadTags().then((map) => {
+    Promise.all([loadTags(), loadCustomTags()]).then(([map, list]) => {
       tags = map
+      customTags = list
       scanNow()
     })
   }
@@ -69,7 +82,7 @@ export function startPlayerTags(doc: Document = document): PlayerTagsController 
           console.warn('[ra2-names] setTag failed:', e)
           reloadFromStorage()
         })
-      })
+      }, allPlayerTags(customTags))
     },
     onRemove(name) {
       tags = cloneTagMap(tags)
@@ -88,7 +101,7 @@ export function startPlayerTags(doc: Document = document): PlayerTagsController 
     const keep = new Set<HTMLElement>()
     for (const slot of findNameSlots(doc)) {
       try {
-        keep.add(syncWidget(slot, tags[slot.name], handlers))
+        keep.add(syncWidget(slot, tags[slot.name], handlers, customTags))
       }
       catch (e) {
         // One malformed slot/tag must not stop the rest of the scan (and skipping pruneWidgets
@@ -127,9 +140,15 @@ export function startPlayerTags(doc: Document = document): PlayerTagsController 
     schedule()
   })
 
-  const ready = loadTags()
-    .then((map) => {
+  const offCustomChanged = onCustomTagsChanged((list) => {
+    customTags = list
+    schedule()
+  })
+
+  const ready = Promise.all([loadTags(), loadCustomTags()])
+    .then(([map, list]) => {
       tags = map
+      customTags = list
       scanNow()
     })
     .catch(e => console.warn('[ra2-names] loadTags failed:', e))
@@ -138,6 +157,7 @@ export function startPlayerTags(doc: Document = document): PlayerTagsController 
     stopped = true
     observer.disconnect()
     offChanged()
+    offCustomChanged()
     closeTagMenu()
     pruneWidgets(doc, new Set())
   }
