@@ -55,17 +55,20 @@ describe('readConfigFromStorage', () => {
     expect(d.settings).toEqual(normalizeSettings(undefined))
     expect(d.snapshots).toEqual([])
     expect(Object.keys(d.playerTags)).toEqual([])
+    expect(d.customPlayerTags).toEqual([])
   })
 
-  it('reads and normalizes all three keys', async () => {
+  it('reads and normalizes all four keys', async () => {
     mem.ra2NamesSettings = { enabled: true, fontSize: 16 }
     mem.ra2NamesSnapshots = [{ name: 'a', shownUnits: ['e1'], totalCount: 2 }, { hiddenUnits: ['X'] }]
     mem.ra2PlayerTags = { bob: 'enemy', bad: 'NOPE!' }
+    mem.ra2CustomPlayerTags = [{ id: 'camper', label: '蹲家', bg: '#9333ea' }, { id: 'enemy', label: 'x', bg: '#000000' }]
     const d = await readConfigFromStorage()
     expect(d.settings.enabled).toBe(true)
     expect(d.settings.fontSize).toBe(16)
     expect(d.snapshots).toEqual([{ name: 'a', shownUnits: ['E1'], totalCount: 2 }])
     expect({ ...d.playerTags }).toEqual({ bob: 'enemy' })
+    expect(d.customPlayerTags).toEqual([{ id: 'camper', label: '蹲家', bg: '#9333ea' }])
   })
 })
 
@@ -90,5 +93,13 @@ describe('writeConfigToStorage', () => {
   it('does nothing when data is empty', async () => {
     await writeConfigToStorage({})
     expect(set).not.toHaveBeenCalled()
+  })
+
+  it('writes customPlayerTags together with the other sections', async () => {
+    await writeConfigToStorage({ customPlayerTags: [{ id: 'camper', label: '蹲家', bg: '#9333ea' }], playerTags: Object.assign(Object.create(null), { a: 'camper' }) })
+    expect(set).toHaveBeenCalledTimes(1)
+    expect(Object.keys(set.mock.calls[0][0]).sort()).toEqual(['ra2CustomPlayerTags', 'ra2PlayerTags'])
+    expect(mem.ra2CustomPlayerTags).toEqual([{ id: 'camper', label: '蹲家', bg: '#9333ea' }])
+    expect(CONFIG_STORAGE_KEYS.customPlayerTags).toBe('ra2CustomPlayerTags')
   })
 })

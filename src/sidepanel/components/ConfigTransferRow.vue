@@ -26,6 +26,8 @@ const pendingParts = computed(() => {
     parts.push(`${p.snapshotCount} 個快照`)
   if (p.playerTagCount !== null)
     parts.push(`${p.playerTagCount} 個玩家標記`)
+  if (p.customTagCount !== null)
+    parts.push(`${p.customTagCount} 個自訂標籤`)
   return parts
 })
 
@@ -49,7 +51,7 @@ const btn = 'px-3 py-1.5 rounded-lg bg-secondary hover:bg-secondary/80 text-sm t
           設定檔
         </p>
         <p class="text-xs text-muted-foreground">
-          匯出 / 匯入設定、快照與玩家標記
+          匯出 / 匯入設定、快照、玩家標記與自訂標籤
         </p>
       </div>
       <div class="flex gap-2">

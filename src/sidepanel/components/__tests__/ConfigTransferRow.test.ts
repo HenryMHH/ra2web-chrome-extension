@@ -38,7 +38,7 @@ describe('configTransferRow', () => {
 
   it('shows pending summary with only present sections', () => {
     const w = mount(ConfigTransferRow, {
-      props: { pending: { settings: true, snapshotCount: 3, playerTagCount: null } },
+      props: { pending: { settings: true, snapshotCount: 3, playerTagCount: null, customTagCount: null } },
     })
     const p = w.find('[data-testid="config-pending"]')
     expect(p.text()).toContain('設定')
@@ -48,7 +48,7 @@ describe('configTransferRow', () => {
 
   it('emits confirm / cancel from pending box', async () => {
     const w = mount(ConfigTransferRow, {
-      props: { pending: { settings: false, snapshotCount: null, playerTagCount: 2 } },
+      props: { pending: { settings: false, snapshotCount: null, playerTagCount: 2, customTagCount: null } },
     })
     expect(w.find('[data-testid="config-pending"]').text()).toContain('2 個玩家標記')
     await w.find('[data-testid="config-confirm"]').trigger('click')
@@ -59,7 +59,7 @@ describe('configTransferRow', () => {
 
   it('disables all buttons while busy', () => {
     const w = mount(ConfigTransferRow, {
-      props: { pending: { settings: true, snapshotCount: 0, playerTagCount: 0 }, busy: true },
+      props: { pending: { settings: true, snapshotCount: 0, playerTagCount: 0, customTagCount: 0 }, busy: true },
     })
     for (const id of ['config-export', 'config-import', 'config-confirm', 'config-cancel'])
       expect(w.find(`[data-testid="${id}"]`).attributes('disabled')).toBeDefined()
@@ -67,9 +67,16 @@ describe('configTransferRow', () => {
 
   it('disables import/export buttons while a pending import awaits confirmation', () => {
     const w = mount(ConfigTransferRow, {
-      props: { pending: { settings: true, snapshotCount: null, playerTagCount: null } },
+      props: { pending: { settings: true, snapshotCount: null, playerTagCount: null, customTagCount: null } },
     })
     expect(w.find('[data-testid="config-export"]').attributes('disabled')).toBeDefined()
     expect(w.find('[data-testid="config-import"]').attributes('disabled')).toBeDefined()
+  })
+
+  it('lists custom tag count in the pending summary', () => {
+    const w = mount(ConfigTransferRow, {
+      props: { pending: { settings: false, snapshotCount: null, playerTagCount: null, customTagCount: 2 } },
+    })
+    expect(w.find('[data-testid="config-pending"]').text()).toContain('2 個自訂標籤')
   })
 })

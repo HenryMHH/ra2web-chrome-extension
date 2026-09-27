@@ -3,6 +3,8 @@ import { normalizeSettings, normalizeShown } from '~/composables/useRa2Settings'
 import type { Snapshot } from '~/composables/useRa2Snapshots'
 import type { PlayerTagMap } from '~/contentScripts/playerTags/store'
 import { normalizeTagMap } from '~/contentScripts/playerTags/store'
+import type { PlayerTagDef } from '~/constants/playerTags'
+import { normalizeCustomTags } from '~/constants/playerTags'
 import { CRATE_TYPES } from '~/constants/powerups'
 
 export const CONFIG_FILE_FORMAT = 'ra2web-assistant-config'
@@ -17,6 +19,7 @@ export interface ConfigData {
   settings?: Ra2Settings
   snapshots?: Snapshot[]
   playerTags?: PlayerTagMap
+  customPlayerTags?: PlayerTagDef[]
 }
 
 export interface ConfigFile {
@@ -31,6 +34,7 @@ export interface ImportSummary {
   settings: boolean
   snapshotCount: number | null
   playerTagCount: number | null
+  customTagCount: number | null
 }
 
 export type ParseResult =
@@ -48,6 +52,7 @@ export function buildConfigFile(data: Required<ConfigData>, now: Date): ConfigFi
       // Spread into a plain object so JSON.stringify output is ordinary; the
       // null-prototype invariant is restored by normalizeTagMap on import.
       playerTags: { ...data.playerTags },
+      customPlayerTags: data.customPlayerTags.map(t => ({ ...t })),
     },
   }
 }
@@ -101,7 +106,7 @@ export function parseConfigFile(text: string): ParseResult {
 
   const raw = root.data
   const data: ConfigData = {}
-  const summary: ImportSummary = { settings: false, snapshotCount: null, playerTagCount: null }
+  const summary: ImportSummary = { settings: false, snapshotCount: null, playerTagCount: null, customTagCount: null }
 
   if ('settings' in raw) {
     if (!isPlainObject(raw.settings))
@@ -121,7 +126,13 @@ export function parseConfigFile(text: string): ParseResult {
     data.playerTags = normalizeTagMap(raw.playerTags)
     summary.playerTagCount = Object.keys(data.playerTags).length
   }
-  if (!summary.settings && summary.snapshotCount === null && summary.playerTagCount === null)
+  if ('customPlayerTags' in raw) {
+    if (!Array.isArray(raw.customPlayerTags))
+      return { ok: false, error: '設定檔格式錯誤:customPlayerTags' }
+    data.customPlayerTags = normalizeCustomTags(raw.customPlayerTags)
+    summary.customTagCount = data.customPlayerTags.length
+  }
+  if (!summary.settings && summary.snapshotCount === null && summary.playerTagCount === null && summary.customTagCount === null)
     return { ok: false, error: '設定檔內沒有可匯入的資料' }
   return { ok: true, data, summary }
 }
@@ -140,6 +151,7 @@ export const CONFIG_STORAGE_KEYS = {
   settings: 'ra2NamesSettings',
   snapshots: 'ra2NamesSnapshots',
   playerTags: 'ra2PlayerTags',
+  customPlayerTags: 'ra2CustomPlayerTags',
 } as const
 
 export async function readConfigFromStorage(): Promise<Required<ConfigData>> {
@@ -150,6 +162,7 @@ export async function readConfigFromStorage(): Promise<Required<ConfigData>> {
     settings: normalizeSettings(obj[CONFIG_STORAGE_KEYS.settings] as Parameters<typeof normalizeSettings>[0]),
     snapshots: Array.isArray(rawSnaps) ? sanitizeSnapshots(rawSnaps) : [],
     playerTags: normalizeTagMap(obj[CONFIG_STORAGE_KEYS.playerTags]),
+    customPlayerTags: normalizeCustomTags(obj[CONFIG_STORAGE_KEYS.customPlayerTags]),
   }
 }
 
@@ -161,10 +174,12 @@ export async function writeConfigToStorage(data: ConfigData): Promise<void> {
     payload[CONFIG_STORAGE_KEYS.snapshots] = data.snapshots
   if (data.playerTags)
     payload[CONFIG_STORAGE_KEYS.playerTags] = { ...data.playerTags }
+  if (data.customPlayerTags)
+    payload[CONFIG_STORAGE_KEYS.customPlayerTags] = data.customPlayerTags
   if (Object.keys(payload).length === 0)
     return
   // JSON-roundtrip strips Vue reactive Proxy wrappers; chrome.storage.local.set
   // uses structured clone and throws DataCloneError on reactive arrays/objects.
-  // Single set() so the three keys land together.
+  // Single set() so all present keys land together.
   await browser.storage.local.set(JSON.parse(JSON.stringify(payload)))
 }

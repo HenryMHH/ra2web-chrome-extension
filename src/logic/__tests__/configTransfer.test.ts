@@ -70,7 +70,12 @@ describe('buildConfigFile', () => {
     const tags = emptyTagMap()
     tags.alice = 'enemy'
     const f = buildConfigFile(
-      { settings, snapshots: [{ name: 's', shownUnits: ['E1'], totalCount: 3 }], playerTags: tags },
+      {
+        settings,
+        snapshots: [{ name: 's', shownUnits: ['E1'], totalCount: 3 }],
+        playerTags: tags,
+        customPlayerTags: [{ id: 'camper', label: '蹲家', bg: '#9333ea' }],
+      },
       new Date('2026-09-27T12:00:00.000Z'),
     )
     expect(f.format).toBe(CONFIG_FILE_FORMAT)
@@ -79,6 +84,7 @@ describe('buildConfigFile', () => {
     expect(f.data.settings).toEqual(settings)
     expect(f.data.snapshots).toHaveLength(1)
     expect(f.data.playerTags).toEqual({ alice: 'enemy' })
+    expect(f.data.customPlayerTags).toEqual([{ id: 'camper', label: '蹲家', bg: '#9333ea' }])
   })
 
   it('round-trips through parseConfigFile', () => {
@@ -86,7 +92,7 @@ describe('buildConfigFile', () => {
     const tags = emptyTagMap()
     tags.bob = 'newbie'
     const snapshots = [{ name: 's', shownUnits: ['E1'] as string[], totalCount: 3 }]
-    const text = JSON.stringify(buildConfigFile({ settings, snapshots, playerTags: tags }, new Date()))
+    const text = JSON.stringify(buildConfigFile({ settings, snapshots, playerTags: tags, customPlayerTags: [{ id: 'camper', label: '蹲家', bg: '#9333ea' }] }, new Date()))
     const r = parseConfigFile(text)
     expect(r.ok).toBe(true)
     if (!r.ok)
@@ -94,7 +100,8 @@ describe('buildConfigFile', () => {
     expect(r.data.settings).toEqual(settings)
     expect(r.data.snapshots).toEqual(snapshots)
     expect({ ...r.data.playerTags }).toEqual({ bob: 'newbie' })
-    expect(r.summary).toEqual({ settings: true, snapshotCount: 1, playerTagCount: 1 })
+    expect(r.data.customPlayerTags).toEqual([{ id: 'camper', label: '蹲家', bg: '#9333ea' }])
+    expect(r.summary).toEqual({ settings: true, snapshotCount: 1, playerTagCount: 1, customTagCount: 1 })
   })
 })
 
@@ -136,9 +143,10 @@ describe('parseConfigFile — rejects', () => {
 describe('parseConfigFile — sanitizes', () => {
   it('only reports sections present in file', () => {
     const r = parseConfigFile(wrap({ playerTags: { a: 'reliable' } }))
-    expect(r.ok && r.summary).toEqual({ settings: false, snapshotCount: null, playerTagCount: 1 })
+    expect(r.ok && r.summary).toEqual({ settings: false, snapshotCount: null, playerTagCount: 1, customTagCount: null })
     expect(r.ok && 'settings' in r.data).toBe(false)
     expect(r.ok && 'snapshots' in r.data).toBe(false)
+    expect(r.ok && 'customPlayerTags' in r.data).toBe(false)
   })
 
   it('clamps fontSize and filters unknown / duplicate crate ids', () => {
@@ -220,6 +228,30 @@ describe('parseConfigFile — sanitizes', () => {
     expect(Object.getPrototypeOf(r.data.playerTags)).toBeNull()
     expect(Object.keys(r.data.playerTags!).sort()).toEqual(['__proto__', 'a'])
     expect(Object.getOwnPropertyDescriptor(r.data.playerTags, '__proto__')?.value).toBe('enemy')
+  })
+
+  it('sanitizes customPlayerTags and counts them', () => {
+    const r = parseConfigFile(wrap({
+      customPlayerTags: [
+        { id: 'camper', label: ' 蹲家 ', bg: '#9333EA' },
+        { id: 'enemy', label: 'x', bg: '#000000' },
+        { id: 'Bad', label: 'x', bg: '#000000' },
+      ],
+    }))
+    expect(r.ok).toBe(true)
+    if (!r.ok)
+      return
+    expect(r.data.customPlayerTags).toEqual([{ id: 'camper', label: '蹲家', bg: '#9333ea' }])
+    expect(r.summary).toEqual({ settings: false, snapshotCount: null, playerTagCount: null, customTagCount: 1 })
+  })
+
+  it('rejects customPlayerTags section that is not an array', () => {
+    expect(parseConfigFile(wrap({ customPlayerTags: {} }))).toEqual({ ok: false, error: '設定檔格式錯誤:customPlayerTags' })
+  })
+
+  it('keeps assignments to custom ids even when the file has no customPlayerTags section', () => {
+    const r = parseConfigFile(wrap({ playerTags: { a: 'camper' } }))
+    expect(r.ok && { ...r.data.playerTags }).toEqual({ a: 'camper' })
   })
 })
 
