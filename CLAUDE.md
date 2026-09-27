@@ -9,8 +9,8 @@
 3. 地圖上顯示**寶箱內容物**(中文標籤)
 4. 依單位類型**過濾**要顯示哪些 label(custom / preset 兩種模式)
 5. 標籤**字體大小**可調
-6. 在玩家列表(遊戲房 / 遊戲中 / 結算)標記**玩家性質**(可靠 / 敵人 / 自私 / 新手)
-7. sidepanel **匯出 / 匯入設定檔**(設定 + 快照 + 玩家標記,JSON)
+6. 在玩家列表(遊戲房 / 遊戲中 / 結算)標記**玩家性質**(內建:可靠 / 敵人 / 自私 / 新手;另可在 sidepanel 自訂標籤)
+7. sidepanel **匯出 / 匯入設定檔**(設定 + 快照 + 玩家標記 + 自訂標籤,JSON)
 
 來源檔案:`ra2web.min.js`,~4.2MB / ~9.6 萬行 minified JS。
 
@@ -449,6 +449,8 @@ src/
 │   │   ├── IndicatorsRow.vue        # 「畫面外敵人指標」開關
 │   │   ├── CrateSection.vue         # 寶箱 type 多選 grid
 │   │   ├── FilterSection.vue        # custom / preset 切換 + 清單 + 快照
+│   │   ├── GeneralSettingsSection.vue # 「一般設定」accordion(預設收合):玩家標籤 + 設定檔
+│   │   ├── PlayerTagSection.vue     # 「玩家標籤」:內建標籤展示 + 自訂標籤新增/編輯/刪除(ID / 文字 / 調色盤)
 │   │   ├── ConfigTransferRow.vue    # 設定檔匯出/匯入列(行內確認)
 │   │   ├── ApplyBar.vue             # 篩選 commit 按鈕(含 disabled 邏輯)
 │   │   ├── CheckAnimation.vue       # ApplyBar success 用的打勾動畫
@@ -461,6 +463,7 @@ src/
 ├── composables/                     # 共用 composables(從 popup/composables 提升上來)
 │   ├── useRa2Settings.ts            # ra2NamesSettings load/save + legacy migration
 │   ├── useRa2Snapshots.ts           # ra2NamesSnapshots + legacy snapshot 過濾
+│   ├── useCustomPlayerTags.ts       # ra2CustomPlayerTags reactive 清單 + onChanged 同步
 │   ├── useRa2Bridge.ts              # webext-bridge sendMessage wrapper
 │   ├── useToast.ts                  # 全域 toast 狀態
 │   ├── useCurrentUrl.ts             # 監聽當前 tab url(判斷是否在 ra2 頁)
@@ -472,7 +475,7 @@ src/
 ├── constants/
 │   ├── gameVersion.ts               # RA2_GAME_VERSION 字串(顯示用)
 │   ├── icons.ts                     # action icon path 對應
-│   ├── playerTags.ts                # PLAYER_TAGS(可靠 / 敵人 / 自私 / 新手)+ type guard
+│   ├── playerTags.ts                # 內建 PLAYER_TAGS + 自訂標籤規則(ID 格式 / 上限 / 調色盤)+ validate / normalize / 對比色
 │   └── powerups.ts                  # CRATE_TYPES + POWERUP_LABELS (sidepanel + injected 共用)
 ├── logic/
 │   ├── storage.ts
@@ -519,15 +522,17 @@ content script ↔ injected script:`window.postMessage` 每筆帶 `id` / 3 秒 t
 
 ### sidepanel UI
 
-- **設定檔**:匯出(下載 JSON)/ 匯入(選檔 → 行內確認 → 覆寫 → 立即 apply),位於「顯示單位名稱」上方(`SettingsSection` 的 `top` slot)
 - **顯示單位名稱**(主開關) + 副選項「自己 / 盟友 / 敵方 / 中立」 + 字級拉桿(10–20 px,1px 步進)
 - **畫面外敵人指標**獨立開關
 - **寶箱**:15 種 powerup type 多選 grid(`CrateSection`)
 - **篩選**(`FilterSection`):custom / preset tabs;custom 模式 = checkbox 清單 + 搜尋 + 全選/全不選 + 儲存快照;preset 模式 = 快照下拉 + 刪除。**有 `ApplyBar` 提交按鈕**;尚未提交時主開關不會 instant-apply 篩選變更(filter 走 commit,其餘走 instant —— 見 Section 五 draft/commit 說明)
+- **一般設定**(`GeneralSettingsSection`,位於單位篩選下方,預設收合):
+  - **玩家標籤**:四個內建標籤唯讀展示;自訂標籤可新增(ID / 顯示文字 / 顏色:9 色調色盤 + 原生取色器)、編輯(ID 鎖定,只改文字 / 顏色)、刪除(行內確認,連帶移除指向它的玩家指派)
+  - **設定檔**:匯出(下載 JSON)/ 匯入(選檔 → 行內確認 → 覆寫 → 立即 apply)
 - **已套用篩選**(`ActiveFilterInfo`):顯示上一次 apply 的模式 / 名稱 / 已顯示計數
 - **StatusBar**:`idle | ok | active | error` 四態,Sidepanel mount 時 ping `status` + 監聽 `chrome.tabs.onActivated` 更新
 
-設定持久化:`ra2NamesSettings`(主)、`ra2NamesSnapshots`(快照陣列)——兩支 composable(`useRa2Settings.ts` / `useRa2Snapshots.ts`)各自掛 `storage.onChanged` listener,在跨頁修改時即時同步。`ra2PlayerTags`(玩家標記,`Record<玩家名, PlayerTagId>`)不經 composable,同步走 content script 內的 `store.onTagsChanged`(見第十一節)。
+設定持久化:`ra2NamesSettings`(主)、`ra2NamesSnapshots`(快照陣列)——兩支 composable(`useRa2Settings.ts` / `useRa2Snapshots.ts`)各自掛 `storage.onChanged` listener,在跨頁修改時即時同步。`ra2PlayerTags`(玩家標記,`Record<玩家名, PlayerTagId>`)不經 composable,同步走 content script 內的 `store.onTagsChanged`(見第十一節)。`ra2CustomPlayerTags`(自訂標籤定義 `PlayerTagDef[]`)sidepanel 端走 `useCustomPlayerTags`,content script 端走 `store.onCustomTagsChanged`。
 
 ### manifest.json 重點
 
@@ -849,6 +854,12 @@ chronodivide 對照組:
 - Widget 是 0 寬 `span.ra2pt-anchor` + 絕對定位內容,不改遊戲元素 style。`syncWidget` idempotent(`data-name` / `data-tag` 相同就不動 DOM),`pruneWidgets` 清掉失效 anchor;MutationObserver 過濾自己造成的 mutation,避免無限重掃。
 - Dropdown 是 body-level `position:fixed`(`menu.ts`),避開遊戲容器 overflow / z-index;outside mousedown(capture)/ Esc 關閉;同一按鈕再點 = toggle。選單開啟期間按 Esc 會 `e.stopPropagation()` + `e.preventDefault()` 後才 `closeTagMenu()`,避免同一個 Esc 又被遊戲收到(例如把外交畫面也關掉);這個 keydown listener 只在選單開啟時掛著,選單關閉後 Esc 不受影響。
 - Storage `ra2PlayerTags`:`Record<玩家名(trim), 'reliable'|'enemy'|'selfish'|'newbie'>`,寫入一律 read-modify-write(`all_frames` 下可能多實例)。`onTagsChanged` 讓跨畫面 / 跨分頁即時同步。tag map 一律用 `Object.create(null)` 建構(`normalizeTagMap` / `cloneTagMap`),避免名字剛好是 `constructor`/`toString` 等 `Object.prototype` 成員時查詢誤命中,也讓名字是 `__proto__` 的玩家能正常寫入(一般物件對 `__proto__` 這個 key 走的是 setter,不是一般屬性賦值)。
+
+- **自訂標籤**:定義存在 `ra2CustomPlayerTags`(`{ id, label, bg }[]`,陣列順序 = dropdown 順序,排在四個內建之後)。規則集中在 `constants/playerTags.ts`:ID `/^[a-z0-9][a-z0-9_-]{0,23}$/`、不可與內建相同、label 1–8 字(code point)、顏色 `#rrggbb`、最多 20 個;`normalizeCustomTags` 丟棄(不修補)不合法項目。
+- `ra2PlayerTags` 的值只驗 **ID 格式**(`isValidTagId`),不驗定義是否存在。定義存在與否在 `syncWidget` 渲染時用 `getPlayerTag(id, custom)` 判斷;找不到定義 = 視為未標記(顯示「+」且 `data-tag` 為空,點擊開選單而非 `onRemove`)。widget 以 `data-sig`(`label|bg`)偵測同 id 定義變更並重繪;文字色由 `tagTextColor` 依底色亮度選黑 / 白。
+- 刪除自訂標籤(`store.deleteCustomTag`)會在**同一次** `storage.local.set` 裡連帶刪除所有指向它的指派;拒絕刪內建 id。編輯不可改 ID(ID 是指派表裡的值)。匯入不做懸空指派清理。
+- controller 同時 `loadTags` + `loadCustomTags`,並監聽 `onTagsChanged` / `onCustomTagsChanged`;dropdown 用 `allPlayerTags(customTags)`。
+
 - 限制:名稱為 key,跨伺服器同名視為同一人;`stopPropagation` 只擋冒泡,遊戲若在 capture phase 攔事件仍會收到。
 
 ---
@@ -867,7 +878,8 @@ chronodivide 對照組:
   "data": {
     "settings": { "...": "Ra2Settings" },
     "snapshots": [{ "name": "...", "shownUnits": "all", "totalCount": 0 }],
-    "playerTags": { "玩家名": "reliable" }
+    "playerTags": { "玩家名": "reliable" },
+    "customPlayerTags": [{ "id": "camper", "label": "蹲家", "bg": "#9333ea" }]
   }
 }
 ```
@@ -876,7 +888,7 @@ chronodivide 對照組:
 
 ### Section 覆寫語意
 
-`ConfigData` 三個欄位(`settings` / `snapshots` / `playerTags`)各自獨立:`parseConfigFile` 只在 JSON 的 `data` 裡**有**該 key 時才填入回傳的 `data` 並把 `ImportSummary` 對應欄位設為非空(`settings: true` / `snapshotCount`、`playerTagCount` 為數字);沒有該 key 就整個略過。`confirmImport` → `writeConfigToStorage` 也照這個「有才覆寫」規則逐欄寫入 `browser.storage.local`,檔案裡沒有的 section 完全不動既有 storage。`ImportSummary` 同時驅動 `ConfigTransferRow.vue` 的行內確認文字(「將覆寫目前的:設定、N 個快照、N 個玩家標記」)。
+`ConfigData` 四個欄位(`settings` / `snapshots` / `playerTags` / `customPlayerTags`)各自獨立:`parseConfigFile` 只在 JSON 的 `data` 裡**有**該 key 時才填入回傳的 `data` 並把 `ImportSummary` 對應欄位設為非空(`settings: true` / `snapshotCount`、`playerTagCount`、`customTagCount` 為數字);沒有該 key 就整個略過。`confirmImport` → `writeConfigToStorage` 也照這個「有才覆寫」規則逐欄寫入 `browser.storage.local`,檔案裡沒有的 section 完全不動既有 storage。`ImportSummary` 同時驅動 `ConfigTransferRow.vue` 的行內確認文字(「將覆寫目前的:設定、N 個快照、N 個玩家標記、N 個自訂標籤」)。
 
 ### Sanitize 規則
 
@@ -885,12 +897,15 @@ chronodivide 對照組:
 - **settings**:`parseConfigFile`(匯入)呼叫私有的 `sanitizeSettings`(`configTransfer.ts:59-68`,唯一呼叫點在 `~108`):先過 `normalizeSettings`(既有的 legacy migration / 預設值邏輯),再夾字級 `fontSize` 到 10–20 並四捨五入,`enabledCrateTypes` 過濾成只保留 `CRATE_TYPES` 白名單內的數字 id(`Set` 去重)。`readConfigFromStorage`(匯出,`~149`)只呼叫裸的 `normalizeSettings`,**不做**這兩步額外夾值——所以匯出的 `fontSize` / `enabledCrateTypes` 就是 storage 裡現有的值,不會被重新 clamp / 過濾
 - **snapshots**:兩端都呼叫同一個 `sanitizeSnapshots`,逐筆驗證,不是 plain object、缺 `shownUnits`、`name` 不是非空字串就整筆丟棄(不是整檔失敗);`shownUnits` 過 `normalizeShown`,`totalCount` 非有限數字或負數時 fallback 為 `0`
 - **playerTags**:兩端都呼叫同一個 `normalizeTagMap`(`~/contentScripts/playerTags/store`,見第十一節)還原 `Object.create(null)` 不變式
+- **customPlayerTags**:兩端都呼叫同一個 `normalizeCustomTags`(`~/constants/playerTags`);非陣列 → 整檔拒絕(`設定檔格式錯誤:customPlayerTags`),陣列內不合法 / 重複 / 撞內建 id 的項目逐筆丟棄。匯入 `playerTags` 但沒帶 `customPlayerTags` 時,指向本機不存在之自訂 id 的指派照樣寫入(渲染時視為未標記)。
 - **檔案大小**:`Sidepanel.vue` 的 `pickConfigFile` 先比對 `File.size`(bytes)是否超過 `MAX_CONFIG_FILE_BYTES`(`1_000_000`),超過就直接拒絕、連 `readFileText` 都不呼叫,避免把整個超大檔案讀進記憶體。`parseConfigFile` 內 `text.length`(UTF-16 code unit 數)的檢查留著當 backstop(例如萬一有呼叫端跳過前置檢查直接傳文字進來)
 - **`selectedPresetIndex`**:`sanitizeSettings` 額外把它夾成整數且 `>= -1`(`Number.isInteger(i) && i >= -1 ? i : -1`),非整數(如 `0.5`)或小於 `-1`(如 `-7`)一律歸零成 `-1`。`filterMode` 不受影響——只有型別本來就是字面量 union,`normalizeSettings` 的 `raw.filterMode === 'preset' ? 'preset' : 'custom'` 已經是封閉的
 
 ### 版本規則
 
 `version` 是數字,`root.version > CONFIG_FILE_VERSION`(目前 `1`)時拒絕匯入並提示「請先更新擴充功能」。等於或小於目前版本才繼續 parse——目前只有 v1,尚未有舊版轉換邏輯;未來若 schema 有不相容變更,升版號並在 `parseConfigFile` 內加對應的舊版轉換分支(見文末提醒)。
+
+加入 `customPlayerTags` section 時**未升版**:它是新增的 optional section,舊 v1 檔沒有此 key 就不動既有 storage,不會產生錯誤資料。
 
 ### `suppressInstant` + 單次 apply
 
