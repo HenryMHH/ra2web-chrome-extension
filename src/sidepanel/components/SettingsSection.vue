@@ -26,7 +26,6 @@ defineEmits<{
     <h2 class="text-sm font-semibold text-foreground uppercase tracking-wider">
       設定
     </h2>
-    <slot name="top" />
     <DisplayUnitNamesRow
       :model-value="enabled"
       :ally="showAlly"

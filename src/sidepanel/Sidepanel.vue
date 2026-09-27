@@ -10,7 +10,7 @@ import StatusBar from '~/sidepanel/components/StatusBar.vue'
 import ActiveFilterInfo from '~/sidepanel/components/ActiveFilterInfo.vue'
 import type { AppliedFilter } from '~/sidepanel/components/ActiveFilterInfo.vue'
 import Toast from '~/sidepanel/components/Toast.vue'
-import ConfigTransferRow from '~/sidepanel/components/ConfigTransferRow.vue'
+import GeneralSettingsSection from '~/sidepanel/components/GeneralSettingsSection.vue'
 import type { ConfigData, ImportSummary } from '~/logic/configTransfer'
 import {
   MAX_CONFIG_FILE_BYTES,
@@ -24,11 +24,13 @@ import { downloadTextFile, readFileText } from '~/logic/fileIO'
 import type { ShownUnits } from '~/composables/useRa2Settings'
 import { useRa2Settings } from '~/composables/useRa2Settings'
 import { useRa2Snapshots } from '~/composables/useRa2Snapshots'
+import { useCustomPlayerTags } from '~/composables/useCustomPlayerTags'
 import { useRa2Bridge } from '~/composables/useRa2Bridge'
 import { useToast } from '~/composables/useToast'
 
 const { settings, ready, load, save } = useRa2Settings()
 const { snapshots, load: loadSnapshots } = useRa2Snapshots()
+const { load: loadCustomTags } = useCustomPlayerTags()
 const bridge = useRa2Bridge()
 const toast = useToast()
 const status = ref<{ kind: 'idle' | 'ok' | 'active' | 'error', text: string }>({
@@ -63,7 +65,7 @@ function syncDraftFromSettings() {
 let suppressInstant = true
 
 async function reloadFromStorage() {
-  await Promise.all([load(), loadSnapshots()])
+  await Promise.all([load(), loadSnapshots(), loadCustomTags()])
   if (settings.value.selectedPresetIndex >= snapshots.value.length)
     settings.value.selectedPresetIndex = -1
   syncDraftFromSettings()
@@ -318,24 +320,21 @@ watch(
           v-model:show-neutral="settings.showNeutral"
           v-model:show-indicators="settings.showIndicators"
           v-model:font-size="settings.fontSize"
-        >
-          <template #top>
-            <ConfigTransferRow
-              :pending="pendingImport?.summary ?? null"
-              :busy="configBusy"
-              @export="exportConfig"
-              @pick="pickConfigFile"
-              @confirm="confirmImport"
-              @cancel="cancelImport"
-            />
-          </template>
-        </SettingsSection>
+        />
         <CrateSection v-model="settings.enabledCrateTypes" />
         <FilterSection
           v-model:shownUnitsCustom="draftFilter.shownUnitsCustom"
           v-model:filterMode="draftFilter.filterMode"
           v-model:selectedPresetIndex="draftFilter.selectedPresetIndex"
           v-model:totalCount="totalCount"
+        />
+        <GeneralSettingsSection
+          :pending="pendingImport?.summary ?? null"
+          :busy="configBusy"
+          @export="exportConfig"
+          @pick="pickConfigFile"
+          @confirm="confirmImport"
+          @cancel="cancelImport"
         />
       </div>
       <ApplyBar

@@ -43,10 +43,17 @@ async function flush() {
   await new Promise(r => setTimeout(r, 30))
 }
 
-async function mountPanel() {
+async function openGeneral(w: ReturnType<typeof mount>) {
+  await w.findAll('button').find(b => b.text().includes('一般設定'))!.trigger('click')
+  await flush()
+}
+
+async function mountPanel({ general = true }: { general?: boolean } = {}) {
   const Sidepanel = (await import('../Sidepanel.vue')).default
   const w = mount(Sidepanel)
   await flush()
+  if (general)
+    await openGeneral(w)
   return w
 }
 
@@ -66,11 +73,16 @@ afterEach(() => {
 })
 
 describe('sidepanel config export/import', () => {
-  it('places the config row above the display-unit-names row', async () => {
-    const w = await mountPanel()
+  it('puts 玩家標籤 and 設定檔 in a collapsed 一般設定 accordion after the per-game sections', async () => {
+    const w = await mountPanel({ general: false })
+    expect(w.text()).toContain('一般設定')
+    expect(w.find('[data-testid="config-export"]').exists()).toBe(false)
+    expect(w.find('[data-testid="ptag-section"]').exists()).toBe(false)
+    await openGeneral(w)
     const html = w.html()
-    expect(html.indexOf('data-testid="config-export"')).toBeGreaterThan(-1)
-    expect(html.indexOf('data-testid="config-export"')).toBeLessThan(html.indexOf('data-testid="display-toggle"'))
+    expect(html.indexOf('data-testid="general-settings"')).toBeGreaterThan(html.indexOf('data-testid="display-toggle"'))
+    expect(html.indexOf('data-testid="general-settings"')).toBeGreaterThan(html.indexOf('單位篩選'))
+    expect(html.indexOf('data-testid="ptag-section"')).toBeLessThan(html.indexOf('data-testid="config-export"'))
     w.unmount()
   })
 
@@ -184,6 +196,34 @@ describe('sidepanel config export/import', () => {
     expect(w.text()).toContain('匯入失敗')
     expect(w.find('[data-testid="config-pending"]').exists()).toBe(true)
     expect(w.find('[data-testid="config-confirm"]').attributes('disabled')).toBeUndefined()
+    w.unmount()
+  })
+
+  it('exports custom player tag defs', async () => {
+    mem.ra2CustomPlayerTags = [{ id: 'camper', label: '蹲家', bg: '#9333ea' }]
+    const w = await mountPanel()
+    await w.find('[data-testid="config-export"]').trigger('click')
+    await flush()
+    const parsed = JSON.parse((download.mock.calls[0] as [string, string])[1])
+    expect(parsed.version).toBe(1)
+    expect(parsed.data.customPlayerTags).toEqual([{ id: 'camper', label: '蹲家', bg: '#9333ea' }])
+    w.unmount()
+  })
+
+  it('importing custom tags writes them and refreshes the 玩家標籤 list', async () => {
+    const w = await mountPanel()
+    expect(w.findAll('[data-testid="ptag-custom-row"]')).toHaveLength(0)
+    await pickFile(w, {
+      format: 'ra2web-assistant-config',
+      version: 1,
+      data: { customPlayerTags: [{ id: 'camper', label: '蹲家', bg: '#9333ea' }], playerTags: { bob: 'camper' } },
+    })
+    expect(w.find('[data-testid="config-pending"]').text()).toContain('1 個自訂標籤')
+    await w.find('[data-testid="config-confirm"]').trigger('click')
+    await flush()
+    expect(mem.ra2CustomPlayerTags).toEqual([{ id: 'camper', label: '蹲家', bg: '#9333ea' }])
+    expect(mem.ra2PlayerTags).toEqual({ bob: 'camper' })
+    expect(w.findAll('[data-testid="ptag-custom-row"]')).toHaveLength(1)
     w.unmount()
   })
 })
