@@ -195,7 +195,7 @@ describe('parseConfigFile — sanitizes', () => {
   })
 
   it('filters invalid player tags and keeps null-prototype map', () => {
-    const r = parseConfigFile(wrap({ playerTags: { a: 'enemy', b: 'bogus', __proto__x: 1, constructor: 'selfish' } }))
+    const r = parseConfigFile(wrap({ playerTags: { a: 'enemy', b: 'Bogus Tag', __proto__x: 1, constructor: 'selfish' } }))
     expect(r.ok).toBe(true)
     if (!r.ok)
       return

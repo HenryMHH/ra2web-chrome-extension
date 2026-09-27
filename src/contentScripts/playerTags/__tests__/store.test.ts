@@ -51,7 +51,7 @@ const storageApi = {
   storage: storageApi,
 }
 
-const { PLAYER_TAGS, getPlayerTag, isPlayerTagId } = await import('~/constants/playerTags')
+const { PLAYER_TAGS, getPlayerTag, isBuiltinTagId } = await import('~/constants/playerTags')
 const { PLAYER_TAGS_KEY, loadTags, normalizeTagMap, onTagsChanged, removeTag, setTag } = await import('../store')
 
 beforeEach(() => {
@@ -69,10 +69,10 @@ describe('player tag constants', () => {
     ])
   })
 
-  it('isPlayerTagId accepts only known ids', () => {
-    expect(isPlayerTagId('enemy')).toBe(true)
-    expect(isPlayerTagId('friend')).toBe(false)
-    expect(isPlayerTagId(1)).toBe(false)
+  it('isBuiltinTagId accepts only builtin ids', () => {
+    expect(isBuiltinTagId('enemy')).toBe(true)
+    expect(isBuiltinTagId('friend')).toBe(false)
+    expect(isBuiltinTagId(1)).toBe(false)
   })
 
   it('getPlayerTag returns the def', () => {
@@ -91,8 +91,9 @@ describe('normalizeTagMap', () => {
     expect(normalizeTagMap('x')).toEqual({})
   })
 
-  it('drops invalid tag ids and blank names, trims names', () => {
-    expect(normalizeTagMap({ ' alice ': 'enemy', 'bob': 'friend', '  ': 'reliable' })).toEqual({ alice: 'enemy' })
+  it('drops malformed tag ids and blank names, trims names; keeps well-formed custom ids', () => {
+    expect(normalizeTagMap({ ' alice ': 'enemy', 'bob': 'Not Valid!', 'carol': 'camper', '  ': 'reliable', 'dan': 7 }))
+      .toEqual({ alice: 'enemy', carol: 'camper' })
   })
 })
 

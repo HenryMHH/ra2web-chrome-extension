@@ -1,5 +1,5 @@
 import type { PlayerTagId } from '~/constants/playerTags'
-import { isPlayerTagId } from '~/constants/playerTags'
+import { isValidTagId } from '~/constants/playerTags'
 
 export const PLAYER_TAGS_KEY = 'ra2PlayerTags'
 
@@ -19,7 +19,9 @@ export function normalizeTagMap(raw: unknown): PlayerTagMap {
     return out
   for (const [name, id] of Object.entries(raw as Record<string, unknown>)) {
     const key = name.trim()
-    if (key && isPlayerTagId(id))
+    // Format check only: a custom tag's def may live in ra2CustomPlayerTags (or be missing after
+    // a delete elsewhere) — existence is resolved at render time, where a missing def = untagged.
+    if (key && isValidTagId(id))
       out[key] = id
   }
   return out

@@ -60,7 +60,7 @@ describe('readConfigFromStorage', () => {
   it('reads and normalizes all three keys', async () => {
     mem.ra2NamesSettings = { enabled: true, fontSize: 16 }
     mem.ra2NamesSnapshots = [{ name: 'a', shownUnits: ['e1'], totalCount: 2 }, { hiddenUnits: ['X'] }]
-    mem.ra2PlayerTags = { bob: 'enemy', bad: 'nope' }
+    mem.ra2PlayerTags = { bob: 'enemy', bad: 'NOPE!' }
     const d = await readConfigFromStorage()
     expect(d.settings.enabled).toBe(true)
     expect(d.settings.fontSize).toBe(16)
