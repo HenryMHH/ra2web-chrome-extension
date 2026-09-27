@@ -52,7 +52,7 @@ const storageApi = {
 }
 
 const { PLAYER_TAGS, getPlayerTag, isBuiltinTagId } = await import('~/constants/playerTags')
-const { PLAYER_TAGS_KEY, loadTags, normalizeTagMap, onTagsChanged, removeTag, setTag } = await import('../store')
+const { PLAYER_TAGS_KEY, loadTags, normalizeTagMap, onTagsChanged, removeTag, setTag, CUSTOM_TAGS_KEY, countTagsWithId, deleteCustomTag, loadCustomTags, onCustomTagsChanged, upsertCustomTag } = await import('../store')
 
 beforeEach(() => {
   for (const k of Object.keys(mem))
@@ -164,5 +164,61 @@ describe('prototype-pollution safety', () => {
     await removeTag('__proto__')
     const map2 = await loadTags()
     expect(Object.keys(map2)).toEqual([])
+  })
+})
+
+describe('custom tag storage', () => {
+  const camper = { id: 'camper', label: '蹲家', bg: '#9333ea' }
+
+  it('loadCustomTags returns [] when nothing stored and normalizes stored values', async () => {
+    expect(await loadCustomTags()).toEqual([])
+    mem[CUSTOM_TAGS_KEY] = [camper, { id: 'enemy', label: 'x', bg: '#000000' }]
+    expect(await loadCustomTags()).toEqual([camper])
+  })
+
+  it('upsertCustomTag appends a new id', async () => {
+    const list = await upsertCustomTag(camper)
+    expect(list).toEqual([camper])
+    expect(mem[CUSTOM_TAGS_KEY]).toEqual([camper])
+  })
+
+  it('upsertCustomTag replaces an existing id in place (order kept) and reads fresh storage', async () => {
+    mem[CUSTOM_TAGS_KEY] = [camper, { id: 'rusher', label: '快攻', bg: '#dc2626' }]
+    await upsertCustomTag({ id: 'camper', label: '龜', bg: '#16a34a' })
+    expect(mem[CUSTOM_TAGS_KEY]).toEqual([
+      { id: 'camper', label: '龜', bg: '#16a34a' },
+      { id: 'rusher', label: '快攻', bg: '#dc2626' },
+    ])
+  })
+
+  it('countTagsWithId counts assignments of one id', () => {
+    expect(countTagsWithId(normalizeTagMap({ a: 'camper', b: 'enemy', c: 'camper' }), 'camper')).toBe(2)
+  })
+
+  it('deleteCustomTag removes the def and every assignment to it in one write', async () => {
+    mem[CUSTOM_TAGS_KEY] = [camper]
+    mem[PLAYER_TAGS_KEY] = { alice: 'camper', bob: 'enemy', carol: 'camper' }
+    const r = await deleteCustomTag('camper')
+    expect(r).toEqual({ list: [], removedAssignments: 2 })
+    expect(mem[CUSTOM_TAGS_KEY]).toEqual([])
+    expect({ ...mem[PLAYER_TAGS_KEY] }).toEqual({ bob: 'enemy' })
+  })
+
+  it('deleteCustomTag refuses builtin ids (must never wipe builtin assignments)', async () => {
+    mem[PLAYER_TAGS_KEY] = { bob: 'enemy' }
+    await expect(deleteCustomTag('enemy')).rejects.toThrow()
+    expect(mem[PLAYER_TAGS_KEY]).toEqual({ bob: 'enemy' })
+  })
+
+  it('onCustomTagsChanged fires with a normalized list for our key only, and unsubscribes', async () => {
+    const cb = vi.fn()
+    const off = onCustomTagsChanged(cb)
+    await setTag('x', 'enemy')
+    expect(cb).not.toHaveBeenCalled()
+    await upsertCustomTag(camper)
+    expect(cb).toHaveBeenLastCalledWith([camper])
+    off()
+    await upsertCustomTag({ ...camper, label: 'y' })
+    expect(cb).toHaveBeenCalledTimes(1)
   })
 })

@@ -1,5 +1,5 @@
-import type { PlayerTagId } from '~/constants/playerTags'
-import { isValidTagId } from '~/constants/playerTags'
+import type { PlayerTagDef, PlayerTagId } from '~/constants/playerTags'
+import { isBuiltinTagId, isValidTagId, normalizeCustomTags } from '~/constants/playerTags'
 
 export const PLAYER_TAGS_KEY = 'ra2PlayerTags'
 
@@ -65,6 +65,57 @@ export function onTagsChanged(cb: (map: PlayerTagMap) => void): () => void {
     if (area !== 'local' || !changes[PLAYER_TAGS_KEY])
       return
     cb(normalizeTagMap(changes[PLAYER_TAGS_KEY].newValue))
+  }
+  browser.storage.onChanged.addListener(listener)
+  return () => browser.storage.onChanged.removeListener(listener)
+}
+
+export const CUSTOM_TAGS_KEY = 'ra2CustomPlayerTags'
+
+export async function loadCustomTags(): Promise<PlayerTagDef[]> {
+  const obj = await browser.storage.local.get(CUSTOM_TAGS_KEY)
+  return normalizeCustomTags(obj[CUSTOM_TAGS_KEY])
+}
+
+// Read-modify-write like the tag map. Same id → replaced in place (order kept); new id →
+// appended. normalizeCustomTags on the way out means an invalid def never lands in storage and
+// the written value is a plain, Proxy-free array.
+export async function upsertCustomTag(def: PlayerTagDef): Promise<PlayerTagDef[]> {
+  const list = await loadCustomTags()
+  const i = list.findIndex(t => t.id === def.id)
+  const next = i >= 0 ? list.map((t, j) => (j === i ? def : t)) : [...list, def]
+  const clean = normalizeCustomTags(next)
+  await browser.storage.local.set({ [CUSTOM_TAGS_KEY]: clean })
+  return clean
+}
+
+export function countTagsWithId(map: PlayerTagMap, id: PlayerTagId): number {
+  return Object.values(map).filter(v => v === id).length
+}
+
+// Deleting a custom tag also drops every player assignment pointing at it. One set() so the two
+// keys never disagree, and other frames' onChanged listeners see both changes together.
+export async function deleteCustomTag(id: PlayerTagId): Promise<{ list: PlayerTagDef[], removedAssignments: number }> {
+  if (isBuiltinTagId(id))
+    throw new Error(`builtin tag "${id}" cannot be deleted`)
+  const [list, map] = await Promise.all([loadCustomTags(), loadTags()])
+  const nextList = list.filter(t => t.id !== id)
+  let removedAssignments = 0
+  for (const name of Object.keys(map)) {
+    if (map[name] === id) {
+      delete map[name]
+      removedAssignments++
+    }
+  }
+  await browser.storage.local.set({ [CUSTOM_TAGS_KEY]: nextList, [PLAYER_TAGS_KEY]: map })
+  return { list: nextList, removedAssignments }
+}
+
+export function onCustomTagsChanged(cb: (list: PlayerTagDef[]) => void): () => void {
+  const listener = (changes: Record<string, { newValue?: unknown }>, area: string) => {
+    if (area !== 'local' || !changes[CUSTOM_TAGS_KEY])
+      return
+    cb(normalizeCustomTags(changes[CUSTOM_TAGS_KEY].newValue))
   }
   browser.storage.onChanged.addListener(listener)
   return () => browser.storage.onChanged.removeListener(listener)
