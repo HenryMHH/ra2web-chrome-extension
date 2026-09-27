@@ -111,6 +111,21 @@ describe('playerTagSection', () => {
     expect(browserMock.storage.local.set).not.toHaveBeenCalled()
   })
 
+  it('editing a tag deleted elsewhere resets the form instead of re-creating it on submit', async () => {
+    mem.ra2CustomPlayerTags = [{ id: 'camper', label: '蹲家', bg: '#9333ea' }]
+    const w = await mountSection()
+    await w.find('[data-testid="ptag-edit"]').trigger('click')
+    browserMock.storage.local.set.mockClear()
+    const { useCustomPlayerTags } = await import('~/composables/useCustomPlayerTags')
+    useCustomPlayerTags().customTags.value = []
+    await flush()
+    await w.find('[data-testid="ptag-form"]').trigger('submit')
+    await flush()
+    expect(w.find('[data-testid="ptag-error"]').text()).toBe('此標籤已被刪除')
+    expect(browserMock.storage.local.set).not.toHaveBeenCalled()
+    expect(w.find('[data-testid="ptag-submit"]').text()).toBe('新增')
+  })
+
   it('delete asks for confirmation with the affected player count, then cascades', async () => {
     mem.ra2CustomPlayerTags = [{ id: 'camper', label: '蹲家', bg: '#9333ea' }]
     mem.ra2PlayerTags = { alice: 'camper', bob: 'enemy' }

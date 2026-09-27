@@ -48,6 +48,11 @@ function startEdit(t: PlayerTagDef) {
 }
 
 async function submit() {
+  if (editingId.value !== null && !customTags.value.some(t => t.id === editingId.value)) {
+    resetForm()
+    error.value = '此標籤已被刪除'
+    return
+  }
   const def: PlayerTagDef = {
     id: draftId.value.trim(),
     label: draftLabel.value.trim(),
