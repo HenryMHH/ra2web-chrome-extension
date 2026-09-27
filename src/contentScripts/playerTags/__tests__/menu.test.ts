@@ -99,6 +99,15 @@ describe('openTagMenu', () => {
     expect(gameClick).not.toHaveBeenCalled()
     document.body.removeEventListener('click', gameClick)
   })
+
+  it('renders the given tag list (builtins + custom) when provided', async () => {
+    const { allPlayerTags } = await import('~/constants/playerTags')
+    const onPick = vi.fn()
+    openTagMenu(button, onPick, allPlayerTags([{ id: 'camper', label: '蹲家', bg: '#9333ea' }]))
+    expect(menuItems().map(i => i.textContent)).toEqual(['可靠', '敵人', '自私', '新手', '蹲家'])
+    menuItems()[4].click()
+    expect(onPick).toHaveBeenCalledWith('camper')
+  })
 })
 
 describe('swallowEvents', () => {

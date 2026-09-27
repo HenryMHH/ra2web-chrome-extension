@@ -1,4 +1,4 @@
-import type { PlayerTagId } from '~/constants/playerTags'
+import type { PlayerTagDef, PlayerTagId } from '~/constants/playerTags'
 import { PLAYER_TAGS } from '~/constants/playerTags'
 
 export const MENU_CLASS = 'ra2pt-menu'
@@ -24,7 +24,11 @@ export function closeTagMenu(): void {
   current = null
 }
 
-export function openTagMenu(button: HTMLElement, onPick: (id: PlayerTagId) => void): void {
+export function openTagMenu(
+  button: HTMLElement,
+  onPick: (id: PlayerTagId) => void,
+  tags: readonly PlayerTagDef[] = PLAYER_TAGS,
+): void {
   if (current?.button === button) {
     closeTagMenu()
     return
@@ -34,7 +38,7 @@ export function openTagMenu(button: HTMLElement, onPick: (id: PlayerTagId) => vo
   const doc = button.ownerDocument
   const menu = doc.createElement('div')
   menu.className = MENU_CLASS
-  for (const tag of PLAYER_TAGS) {
+  for (const tag of tags) {
     const item = doc.createElement('div')
     item.className = 'ra2pt-menu-item'
     item.dataset.tag = tag.id

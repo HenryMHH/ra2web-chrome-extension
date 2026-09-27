@@ -98,6 +98,33 @@ describe('syncWidget', () => {
     expect(h1.onAdd).not.toHaveBeenCalled()
     expect(h2.onAdd).toHaveBeenCalled()
   })
+
+  const camper = { id: 'camper', label: '蹲家', bg: '#ffff00' }
+
+  it('renders a custom tag from the custom list, with contrast text colour', () => {
+    const a = syncWidget(inlineSlot(), 'camper', handlers(), [camper])
+    const tag = a.querySelector<HTMLElement>('.ra2pt-tag')!
+    expect(tag.textContent).toBe('蹲家')
+    expect(tag.style.background).toContain('rgb(255, 255, 0)')
+    expect(tag.style.color).toBe('rgb(0, 0, 0)')
+  })
+
+  it('an id without a def renders as untagged and "+" opens the menu (not onRemove)', () => {
+    const h = handlers()
+    const a = syncWidget(inlineSlot(), 'camper', h, [])
+    expect(a.querySelector('.ra2pt-btn')!.textContent).toBe('+')
+    expect(a.dataset.tag).toBe('')
+    a.querySelector<HTMLElement>('.ra2pt-btn')!.click()
+    expect(h.onAdd).toHaveBeenCalled()
+    expect(h.onRemove).not.toHaveBeenCalled()
+  })
+
+  it('re-renders when a custom def changes label or colour under the same id', () => {
+    const h = handlers()
+    syncWidget(inlineSlot(), 'camper', h, [camper])
+    const a = syncWidget(inlineSlot(), 'camper', h, [{ ...camper, label: '龜' }])
+    expect(a.querySelector('.ra2pt-tag')!.textContent).toBe('龜')
+  })
 })
 
 describe('pruneWidgets', () => {

@@ -1,8 +1,8 @@
 import { swallowEvents } from './menu'
 import type { NameSlot } from './slots'
 import { ANCHOR_CLASS } from './slots'
-import { getPlayerTag } from '~/constants/playerTags'
-import type { PlayerTagId } from '~/constants/playerTags'
+import { getPlayerTag, tagTextColor } from '~/constants/playerTags'
+import type { PlayerTagDef, PlayerTagId } from '~/constants/playerTags'
 
 export interface WidgetHandlers {
   onAdd: (name: string, button: HTMLElement) => void
@@ -43,12 +43,8 @@ function createAnchor(slot: NameSlot): HTMLElement {
   return a
 }
 
-function render(a: HTMLElement, tag: PlayerTagId | undefined): void {
+function render(a: HTMLElement, def: PlayerTagDef | undefined): void {
   const doc = a.ownerDocument
-  // getPlayerTag can return undefined for a stale/unknown id (defense in depth — should not
-  // normally happen once tag maps are built with Object.create(null), but a corrupt/foreign
-  // storage value must fall back to the untagged "+" state instead of throwing on def.bg).
-  const def = tag ? getPlayerTag(tag) : undefined
   const inner = doc.createElement('span')
   inner.className = 'ra2pt-inner'
   const btn = doc.createElement('button')
@@ -61,20 +57,35 @@ function render(a: HTMLElement, tag: PlayerTagId | undefined): void {
     const label = doc.createElement('span')
     label.className = 'ra2pt-tag'
     label.style.background = def.bg
+    label.style.color = tagTextColor(def.bg)
     label.textContent = def.label
     inner.appendChild(label)
   }
   a.replaceChildren(inner)
 }
 
-export function syncWidget(slot: NameSlot, tag: PlayerTagId | undefined, handlers: WidgetHandlers): HTMLElement {
+export function syncWidget(
+  slot: NameSlot,
+  tag: PlayerTagId | undefined,
+  handlers: WidgetHandlers,
+  custom: readonly PlayerTagDef[] = [],
+): HTMLElement {
   const a = findAnchor(slot) ?? createAnchor(slot)
   handlerMap.set(a, handlers)
-  const tagAttr = tag ?? ''
-  if (a.dataset.name !== slot.name || a.dataset.tag !== tagAttr || !a.firstElementChild) {
+  // Resolve here, not in render: an id with no def (a custom tag deleted elsewhere, an import
+  // that brought assignments but not defs, corrupt storage) must behave as untagged end to end —
+  // "+" shown AND data-tag empty, so the click handler opens the menu instead of calling
+  // onRemove for a tag the user cannot see.
+  const def = tag ? getPlayerTag(tag, custom) : undefined
+  const tagAttr = def?.id ?? ''
+  // Custom defs can change label/colour under the same id, so the id alone is not enough to
+  // decide the DOM is current.
+  const sig = def ? `${def.label}|${def.bg}` : ''
+  if (a.dataset.name !== slot.name || a.dataset.tag !== tagAttr || a.dataset.sig !== sig || !a.firstElementChild) {
     a.dataset.name = slot.name
     a.dataset.tag = tagAttr
-    render(a, tag)
+    a.dataset.sig = sig
+    render(a, def)
   }
   return a
 }
